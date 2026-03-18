@@ -17,17 +17,30 @@
         :key="player.id"
         :player="player"
         :is-current="index === currentPlayerIndex"
-        :is-active-player="index === currentPlayerIndex"
-        :players="players"
-        :current-player-index="currentPlayerIndex"
-        @open-action-menu="openActionMenu"
-        @close-action-menu="closeActionMenu"
+        @drag-start="onDragStart"
+        @drag-over="onDragOver"
+        @drag-end="onDragEnd"
+        :ref="el => playerCards[index] = el"
       />
     </div>
 
     <div class="instructions">
-      <p>Wische auf dem aktiven Spieler nach links/rechts auf einen Gegner für Schadensmenü</p>
+      <p v-if="isDragging">Ziehe zu einem Spieler und lasse los</p>
+      <p v-else>Ziehe vom aktiven Spieler zu einem anderen für Aktionen</p>
     </div>
+
+    <svg v-if="isDragging && dragLine" class="drag-line-svg">
+      <line 
+        :x1="dragLine.x1" 
+        :y1="dragLine.y1" 
+        :x2="dragLine.x2" 
+        :y2="dragLine.y2"
+        stroke="#c41e3a"
+        stroke-width="3"
+        stroke-dasharray="5,5"
+      />
+      <circle :cx="dragLine.x2" :cy="dragLine.y2" r="10" fill="#c41e3a" />
+    </svg>
 
     <ActionMenu 
       v-if="actionMenu.open"
@@ -37,6 +50,10 @@
       @action="handleAction"
     />
 
+    <button class="btn btn-next" @click="endTurn">
+      Zug beenden → {{ nextPlayerName }}
+    </button>
+
     <button class="btn btn-end" @click="$emit('end-game')">
       Spiel beenden
     </button>
@@ -44,7 +61,6 @@
 </template>
 
 <script>
-import { computed, reactive } from 'vue'
 import PlayerCard from './PlayerCard.vue'
 import ActionMenu from './ActionMenu.vue'
 
@@ -58,59 +74,184 @@ export default {
     turnHistory: Array
   },
   emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action'],
-  setup(props, { emit }) {
-    const currentPlayer = computed(() => props.players[props.currentPlayerIndex])
-    
-    const currentTurnNumber = computed(() => {
-      return props.turnHistory.length
-    })
-
-    const formattedTime = computed(() => {
-      const minutes = Math.floor(props.turnDuration / 60)
-      const seconds = props.turnDuration % 60
+  data() {
+    return {
+      isDragging: false,
+      dragSource: null,
+      dragLine: null,
+      playerCards: [],
+      actionMenu: {
+        open: false,
+        target: null,
+        source: null
+      }
+    }
+  },
+  computed: {
+    currentPlayer() {
+      return this.players[this.currentPlayerIndex]
+    },
+    currentTurnNumber() {
+      return this.turnHistory.length
+    },
+    formattedTime() {
+      const minutes = Math.floor(this.turnDuration / 60)
+      const seconds = this.turnDuration % 60
       return `${minutes}:${seconds.toString().padStart(2, '0')}`
-    })
-
-    const actionMenu = reactive({
-      open: false,
-      target: null,
-      source: null
-    })
-
-    const openActionMenu = ({ target, source }) => {
-      actionMenu.open = true
-      actionMenu.target = target
-      actionMenu.source = source
+    },
+    nextPlayerName() {
+      const nextIndex = (this.currentPlayerIndex + 1) % this.players.length
+      return this.players[nextIndex]?.name || 'Nächster'
     }
-
-    const closeActionMenu = () => {
-      actionMenu.open = false
-      actionMenu.target = null
-      actionMenu.source = null
-    }
-
-    const handleAction = (action) => {
-      emit('log-action', action)
+  },
+  mounted() {
+    document.addEventListener('mousemove', this.onMouseMove)
+    document.addEventListener('mouseup', this.onMouseUp)
+    document.addEventListener('touchmove', this.onTouchMove, { passive: false })
+    document.addEventListener('touchend', this.onTouchEnd)
+  },
+  beforeUnmount() {
+    document.removeEventListener('mousemove', this.onMouseMove)
+    document.removeEventListener('mouseup', this.onMouseUp)
+    document.removeEventListener('touchmove', this.onTouchMove)
+    document.removeEventListener('touchend', this.onTouchEnd)
+  },
+  methods: {
+    onDragStart({ player, element }) {
+      this.isDragging = true
+      this.dragSource = player
       
-      if (action.type === 'life' || action.type === 'commander' || action.type === 'toxic') {
-        emit('update-life', action.targetId, action.delta)
-      } else if (action.type === 'poison') {
-        emit('update-poison', action.targetId, action.delta)
-      } else if (action.type === 'custom') {
-        emit('update-life', action.targetId, action.delta)
+      const rect = element.getBoundingClientRect()
+      this.dragLine = {
+        x1: rect.left + rect.width / 2,
+        y1: rect.top + rect.height / 2,
+        x2: rect.left + rect.width / 2,
+        y2: rect.top + rect.height / 2
+      }
+    },
+    
+    onMouseMove(e) {
+      if (!this.isDragging || !this.dragLine) return
+      
+      this.dragLine = {
+        ...this.dragLine,
+        x2: e.clientX,
+        y2: e.clientY
       }
       
-      closeActionMenu()
-    }
-
-    return {
-      currentPlayer,
-      currentTurnNumber,
-      formattedTime,
-      actionMenu,
-      openActionMenu,
-      closeActionMenu,
-      handleAction
+      this.updateTargetHighlight(e.clientX, e.clientY)
+    },
+    
+    onTouchMove(e) {
+      if (!this.isDragging || !this.dragLine) return
+      e.preventDefault()
+      
+      const touch = e.touches[0]
+      this.dragLine = {
+        ...this.dragLine,
+        x2: touch.clientX,
+        y2: touch.clientY
+      }
+      
+      this.updateTargetHighlight(touch.clientX, touch.clientY)
+    },
+    
+    updateTargetHighlight(clientX, clientY) {
+      this.playerCards.forEach((card, index) => {
+        if (!card) return
+        
+        const cardEl = card.$el || card
+        const rect = cardEl.getBoundingClientRect()
+        
+        const isOver = clientX >= rect.left && clientX <= rect.right &&
+                       clientY >= rect.top && clientY <= rect.bottom
+        
+        if (isOver && index !== this.currentPlayerIndex) {
+          cardEl.classList.add('validTarget')
+        } else {
+          cardEl.classList.remove('validTarget')
+        }
+      })
+    },
+    
+    onMouseUp(e) {
+      if (!this.isDragging) return
+      
+      const target = this.findTargetAtPoint(e.clientX, e.clientY)
+      this.handleDrop(target)
+    },
+    
+    onTouchEnd(e) {
+      if (!this.isDragging) return
+      
+      const touch = e.changedTouches[0]
+      const target = this.findTargetAtPoint(touch.clientX, touch.clientY)
+      this.handleDrop(target)
+    },
+    
+    findTargetAtPoint(clientX, clientY) {
+      for (let i = 0; i < this.playerCards.length; i++) {
+        const card = this.playerCards[i]
+        if (!card) continue
+        
+        const cardEl = card.$el || card
+        const rect = cardEl.getBoundingClientRect()
+        
+        if (clientX >= rect.left && clientX <= rect.right &&
+            clientY >= rect.top && clientY <= rect.bottom) {
+          return { player: this.players[i], card }
+        }
+      }
+      return null
+    },
+    
+    handleDrop(target) {
+      if (target && target.player.id !== this.currentPlayer?.id) {
+        this.openActionMenu(target.player)
+      }
+      
+      this.resetDrag()
+    },
+    
+    openActionMenu(targetPlayer) {
+      this.actionMenu.open = true
+      this.actionMenu.target = targetPlayer
+      this.actionMenu.source = this.currentPlayer
+    },
+    
+    closeActionMenu() {
+      this.actionMenu.open = false
+      this.actionMenu.target = null
+      this.actionMenu.source = null
+    },
+    
+    resetDrag() {
+      this.isDragging = false
+      this.dragSource = null
+      this.dragLine = null
+      
+      this.playerCards.forEach(card => {
+        if (card) {
+          const cardEl = card.$el || card
+          cardEl.classList.remove('validTarget')
+        }
+      })
+    },
+    
+    handleAction(action) {
+      this.$emit('log-action', action)
+      
+      if (action.type === 'damage' || action.type === 'heal') {
+        this.$emit('update-life', action.targetId, action.delta)
+      } else if (action.type === 'poison') {
+        this.$emit('update-poison', action.targetId, action.delta)
+      }
+      
+      this.closeActionMenu()
+    },
+    
+    endTurn() {
+      this.$emit('next-turn', [])
     }
   }
 }
@@ -121,6 +262,7 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .game-info {
@@ -213,13 +355,47 @@ export default {
   color: #666;
 }
 
+.drag-line-svg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.btn {
+  padding: 0.8rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-next {
+  margin-top: 0.5rem;
+  background: #c41e3a;
+  color: #fff;
+  width: 100%;
+}
+
+.btn-next:hover {
+  background: #a01830;
+}
+
 .btn-end {
-  margin-top: auto;
+  margin-top: 0.5rem;
   background: transparent;
   border: 2px solid #666;
   color: #888;
   width: 100%;
-  padding: 1rem;
 }
 
 .btn-end:hover {

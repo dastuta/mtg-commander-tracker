@@ -1,74 +1,67 @@
 <template>
   <div class="action-menu-overlay" @click.self="close">
-    <div class="action-menu" :class="{ entering: isEntering }">
+    <div class="action-menu">
       <div class="menu-header">
         <span class="source">{{ sourcePlayer?.name }}</span>
         <span class="arrow">→</span>
         <span class="target">{{ targetPlayer?.name }}</span>
       </div>
 
-      <div class="menu-section">
-        <div class="section-label">Leben</div>
-        <div class="damage-controls">
-          <button class="action-btn damage" @click="doDamage(1)">-1</button>
-          <button class="action-btn damage" @click="doDamage(5)">-5</button>
-          <button class="action-btn damage" @click="doDamage(10)">-10</button>
-          <button class="action-btn heal" @click="doHeal(1)">+1</button>
-          <button class="action-btn heal" @click="doHeal(5)">+5</button>
+      <div class="value-input">
+        <button class="adjust-btn" @click="adjust(-10)">-10</button>
+        <button class="adjust-btn" @click="adjust(-5)">-5</button>
+        <button class="adjust-btn" @click="adjust(-1)">-1</button>
+        <div class="value-display" :class="{ negative: value < 0 }">
+          {{ value >= 0 ? '+' : '' }}{{ value }}
         </div>
-        <div class="custom-input">
-          <button @click="adjustCustom(-5)">-5</button>
-          <button @click="adjustCustom(-1)">-1</button>
-          <input type="number" v-model.number="customValue" placeholder="0" />
-          <button @click="adjustCustom(1)">+1</button>
-          <button @click="adjustCustom(5)">+5</button>
-          <button class="btn-confirm" @click="applyCustom">OK</button>
-        </div>
+        <button class="adjust-btn" @click="adjust(1)">+1</button>
+        <button class="adjust-btn" @click="adjust(5)">+5</button>
+        <button class="adjust-btn" @click="adjust(10)">+10</button>
       </div>
 
-      <div class="menu-section">
-        <div class="section-label">Gift</div>
-        <div class="damage-controls">
-          <button class="action-btn damage" @click="doPoison(1)">+1</button>
-          <button class="action-btn damage" @click="doPoison(2)">+2</button>
-          <button class="action-btn damage" @click="doPoison(5)">+5</button>
-          <button class="action-btn heal" @click="doPoison(-1)" :disabled="targetPlayer?.poison <= 0">-1</button>
-        </div>
+      <div class="action-type">
+        <button 
+          :class="{ active: actionType === 'damage' }" 
+          @click="actionType = 'damage'"
+        >
+          Schaden
+        </button>
+        <button 
+          :class="{ active: actionType === 'heal' }" 
+          @click="actionType = 'heal'"
+        >
+          Heilen
+        </button>
+        <button 
+          :class="{ active: actionType === 'poison' }" 
+          @click="actionType = 'poison'"
+        >
+          Gift
+        </button>
       </div>
 
-      <div class="menu-section">
-        <div class="section-label">Spezial</div>
-        <div class="damage-controls">
-          <button class="action-btn special" @click="doCommanderDamage">Commander-Schaden</button>
-          <button class="action-btn special" @click="doToxicDamage">Toxisch</button>
-        </div>
+      <div class="quick-actions">
+        <button @click="applyQuick(-1)">-1</button>
+        <button @click="applyQuick(-5)">-5</button>
+        <button @click="applyQuick(-10)">-10</button>
+        <button @click="applyQuick(1)">+1</button>
+        <button @click="applyQuick(5)">+5</button>
+        <button @click="applyQuick(10)">+10</button>
       </div>
 
-      <div class="menu-section">
-        <div class="section-label">Custom Aktionen</div>
-        <div class="damage-controls">
-          <button class="action-btn custom" @click="openCustomAction">+ Custom</button>
-        </div>
-        <div v-if="customActions.length > 0" class="custom-actions-list">
-          <button 
-            v-for="(action, index) in customActions" 
-            :key="index"
-            class="action-btn custom"
-            @click="executeCustomAction(action)"
-          >
-            {{ action.name }}
-          </button>
-        </div>
+      <div class="preset-actions">
+        <button class="preset-btn" @click="applyPreset('commander')">Commander</button>
+        <button class="preset-btn" @click="applyPreset('toxic')">Toxisch</button>
       </div>
 
-      <button class="btn-close" @click="close">Schließen</button>
+      <button class="btn-apply" @click="applyValue">
+        Anwenden
+      </button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
-
 export default {
   name: 'ActionMenu',
   props: {
@@ -76,103 +69,68 @@ export default {
     sourcePlayer: Object
   },
   emits: ['close', 'action'],
-  setup(props, { emit }) {
-    const customValue = ref(0)
-    const isEntering = ref(false)
-    const customActions = ref([])
-
-    onMounted(() => {
-      const saved = localStorage.getItem('mtg-commander-custom-actions')
-      if (saved) {
-        customActions.value = JSON.parse(saved)
-      }
-      setTimeout(() => {
-        isEntering.value = true
-      }, 10)
-    })
-
-    const close = () => {
-      isEntering.value = false
-      setTimeout(() => emit('close'), 200)
+  data() {
+    return {
+      value: 0,
+      actionType: 'damage'
     }
-
-    const emitAction = (type, delta) => {
-      emit('action', {
-        type,
-        targetId: props.targetPlayer.id,
-        targetName: props.targetPlayer.name,
-        sourceId: props.sourcePlayer.id,
-        sourceName: props.sourcePlayer.name,
+  },
+  methods: {
+    adjust(delta) {
+      this.value += delta
+    },
+    
+    applyQuick(amount) {
+      this.$emit('action', {
+        type: this.actionType,
+        targetId: this.targetPlayer.id,
+        targetName: this.targetPlayer.name,
+        delta: amount,
+        timestamp: Date.now()
+      })
+      this.close()
+    },
+    
+    applyPreset(preset) {
+      let delta = 0
+      if (preset === 'commander') {
+        delta = -7
+        this.actionType = 'damage'
+      } else if (preset === 'toxic') {
+        delta = -1
+        this.actionType = 'poison'
+      }
+      
+      this.$emit('action', {
+        type: this.actionType,
+        targetId: this.targetPlayer.id,
+        targetName: this.targetPlayer.name,
         delta,
         timestamp: Date.now()
       })
-    }
-
-    const doDamage = (amount) => {
-      emitAction('life', -amount)
-      close()
-    }
-
-    const doHeal = (amount) => {
-      emitAction('life', amount)
-      close()
-    }
-
-    const doPoison = (amount) => {
-      emitAction('poison', amount)
-      close()
-    }
-
-    const doCommanderDamage = () => {
-      emitAction('commander', -7)
-      close()
-    }
-
-    const doToxicDamage = () => {
-      emitAction('toxic', -1)
-      close()
-    }
-
-    const adjustCustom = (delta) => {
-      customValue.value += delta
-    }
-
-    const applyCustom = () => {
-      if (customValue.value !== 0) {
-        const isDamage = customValue.value < 0
-        emitAction(isDamage ? 'life' : 'life', customValue.value)
-        close()
+      this.close()
+    },
+    
+    applyValue() {
+      if (this.value === 0) {
+        this.close()
+        return
       }
-    }
-
-    const openCustomAction = () => {
-      const name = prompt('Name der Custom-Aktion:')
-      if (name) {
-        const action = { name, value: parseInt(prompt('Wert (negativ für Schaden):') || '0') }
-        customActions.value.push(action)
-        localStorage.setItem('mtg-commander-custom-actions', JSON.stringify(customActions.value))
-      }
-    }
-
-    const executeCustomAction = (action) => {
-      emitAction('custom', action.value)
-      close()
-    }
-
-    return {
-      customValue,
-      isEntering,
-      customActions,
-      close,
-      doDamage,
-      doHeal,
-      doPoison,
-      doCommanderDamage,
-      doToxicDamage,
-      adjustCustom,
-      applyCustom,
-      openCustomAction,
-      executeCustomAction
+      
+      const delta = this.actionType === 'damage' ? -Math.abs(this.value) : this.value
+      
+      this.$emit('action', {
+        type: this.actionType,
+        targetId: this.targetPlayer.id,
+        targetName: this.targetPlayer.name,
+        delta,
+        timestamp: Date.now()
+      })
+      this.close()
+    },
+    
+    close() {
+      this.$emit('close')
     }
   }
 }
@@ -198,18 +156,8 @@ export default {
   border-radius: 20px;
   padding: 1.5rem;
   width: 100%;
-  max-width: 400px;
-  max-height: 80vh;
-  overflow-y: auto;
+  max-width: 350px;
   border: 2px solid #c41e3a;
-  transform: scale(0.9) translateY(20px);
-  opacity: 0;
-  transition: all 0.2s ease-out;
-}
-
-.action-menu.entering {
-  transform: scale(1) translateY(0);
-  opacity: 1;
 }
 
 .menu-header {
@@ -234,84 +182,18 @@ export default {
 
 .menu-header .target {
   font-weight: bold;
-  color: #3b82f6;
+  color: #4ade80;
 }
 
-.menu-section {
-  margin-bottom: 1.5rem;
-}
-
-.section-label {
-  font-size: 0.75rem;
-  color: #666;
-  text-transform: uppercase;
-  margin-bottom: 0.8rem;
-  text-align: center;
-}
-
-.damage-controls {
+.value-input {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  justify-content: center;
+  margin-bottom: 1rem;
 }
 
-.action-btn {
-  flex: 1;
-  min-width: 60px;
-  padding: 0.8rem 1rem;
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.action-btn:active {
-  transform: scale(0.95);
-}
-
-.action-btn.damage {
-  background: #7f1d1d;
-  color: #fca5a5;
-}
-
-.action-btn.damage:hover {
-  background: #991b1b;
-}
-
-.action-btn.heal {
-  background: #14532d;
-  color: #86efac;
-}
-
-.action-btn.heal:hover {
-  background: #166534;
-}
-
-.action-btn.special {
-  background: #1e3a5f;
-  color: #93c5fd;
-}
-
-.action-btn.custom {
-  background: #3a3a5a;
-  color: #fff;
-}
-
-.action-btn.custom:hover {
-  background: #4a4a6a;
-}
-
-.custom-input {
-  display: flex;
-  gap: 0.3rem;
-  margin-top: 0.8rem;
-  justify-content: center;
-}
-
-.custom-input button {
+.adjust-btn {
   width: 44px;
   height: 44px;
   border: none;
@@ -319,62 +201,124 @@ export default {
   background: #3a3a5a;
   color: #fff;
   font-size: 1rem;
+  font-weight: bold;
   cursor: pointer;
 }
 
-.custom-input button:hover {
+.adjust-btn:hover {
   background: #4a4a6a;
 }
 
-.custom-input button.btn-confirm {
-  background: #c41e3a;
-  width: auto;
-  padding: 0 1rem;
+.adjust-btn:active {
+  transform: scale(0.95);
 }
 
-.custom-input input {
-  width: 80px;
-  height: 44px;
-  text-align: center;
-  font-size: 1.2rem;
+.value-display {
+  min-width: 80px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: bold;
   background: #0a0a15;
   border: 2px solid #3a3a5a;
   border-radius: 8px;
+  color: #4ade80;
+}
+
+.value-display.negative {
+  color: #ef4444;
+}
+
+.action-type {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.action-type button {
+  flex: 1;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: #3a3a5a;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.action-type button.active {
+  background: #c41e3a;
   color: #fff;
 }
 
-.custom-input input:focus {
-  outline: none;
-  border-color: #c41e3a;
-}
-
-.custom-actions-list {
+.quick-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.8rem;
-  justify-content: center;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
 }
 
-.btn-close {
+.quick-actions button {
+  flex: 1;
+  padding: 0.8rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  background: #2a2a4a;
+  color: #fff;
+}
+
+.quick-actions button:nth-child(-n+3) {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+.quick-actions button:nth-child(n+4) {
+  background: #14532d;
+  color: #86efac;
+}
+
+.quick-actions button:active {
+  transform: scale(0.95);
+}
+
+.preset-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 0.6rem;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.preset-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.btn-apply {
   width: 100%;
   padding: 1rem;
-  background: transparent;
-  border: 2px solid #444;
+  border: none;
   border-radius: 10px;
-  color: #888;
-  font-size: 1rem;
+  background: #c41e3a;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: bold;
   cursor: pointer;
-  margin-top: 1rem;
 }
 
-.btn-close:hover {
-  border-color: #c41e3a;
-  color: #c41e3a;
-}
-
-.action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+.btn-apply:hover {
+  background: #a01830;
 }
 </style>
