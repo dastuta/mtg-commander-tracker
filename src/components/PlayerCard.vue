@@ -61,9 +61,6 @@
               </div>
               <span class="cmd-value">{{ cd.damage }}/20</span>
             </div>
-            <div v-if="commanderDamageList.length === 0" class="no-damage">
-              Kein Commander Schaden
-            </div>
           </div>
           <button class="back-btn" @click.stop="switchToLife">
             ← Zurück
@@ -112,24 +109,22 @@ export default {
     }
   },
   computed: {
+    allOpponents() {
+      if (!this.players || !this.player) return []
+      return this.players.filter(p => p.id !== this.player.id)
+    },
     commanderDamageList() {
-      if (!this.commanderDamage) return []
+      if (!this.players || !this.player) return []
       
-      const list = []
-      for (const [key, damage] of Object.entries(this.commanderDamage)) {
-        const [sourceId, targetId] = key.split('-').map(Number)
-        if (targetId === this.player.id && damage > 0) {
-          const sourcePlayer = this.players?.find(p => p.id === sourceId)
-          if (sourcePlayer) {
-            list.push({
-              sourceId,
-              sourceName: sourcePlayer.name,
-              damage
-            })
-          }
+      return this.allOpponents.map(opponent => {
+        const key = `${opponent.id}-${this.player.id}`
+        const damage = this.commanderDamage?.[key] || 0
+        return {
+          sourceId: opponent.id,
+          sourceName: opponent.name,
+          damage
         }
-      }
-      return list.sort((a, b) => b.damage - a.damage)
+      }).sort((a, b) => b.damage - a.damage)
     },
     totalCommanderDamage() {
       return this.commanderDamageList.reduce((sum, cd) => sum + cd.damage, 0)
