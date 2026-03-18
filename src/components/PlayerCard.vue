@@ -2,7 +2,7 @@
   <div 
     class="player-card" 
     :class="[
-      `position-${tablePosition}`,
+      `rotation-${playerRotation}`,
       { 
         current: isCurrent, 
         dragging: isDragging && currentView === 'life',
@@ -13,6 +13,8 @@
     ]"
     data-player-id="player.id"
   >
+    <button class="rotate-btn" @click.stop="rotateLeft">↶</button>
+    
     <div class="card-content">
       <div class="player-header">
         <span class="player-name">{{ player.name }}</span>
@@ -94,6 +96,8 @@
         </div>
       </div>
     </div>
+    
+    <button class="rotate-btn" @click.stop="rotateRight">↷</button>
   </div>
 </template>
 
@@ -104,18 +108,15 @@ export default {
     player: Object,
     isCurrent: Boolean,
     players: Array,
-    commanderDamage: Object,
-    tablePosition: {
-      type: String,
-      default: 'bottom'
-    }
+    commanderDamage: Object
   },
   emits: ['drag-start'],
   data() {
     return {
       currentView: 'life',
       isDragging: false,
-      cardElement: null
+      cardElement: null,
+      playerRotation: 0
     }
   },
   computed: {
@@ -144,6 +145,12 @@ export default {
     this.cardElement = this.$el
   },
   methods: {
+    rotateLeft() {
+      this.playerRotation = (this.playerRotation - 90 + 360) % 360
+    },
+    rotateRight() {
+      this.playerRotation = (this.playerRotation + 90) % 360
+    },
     switchToLife() {
       this.currentView = 'life'
     },
@@ -181,44 +188,41 @@ export default {
   transition: all 0.2s;
   user-select: none;
   display: flex;
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.player-card.rotation-0 .card-content { transform: rotate(0deg); }
+.player-card.rotation-90 .card-content { transform: rotate(90deg); }
+.player-card.rotation-180 .card-content { transform: rotate(180deg); }
+.player-card.rotation-270 .card-content { transform: rotate(270deg); }
+
+.rotate-btn {
+  width: 30px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  color: #888;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 
-.player-card.position-bottom .card-content {
-  transform: rotate(0deg);
+.rotate-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
 }
 
-.player-card.position-right .card-content {
-  transform: rotate(90deg);
-}
-
-.player-card.position-top .card-content {
-  transform: rotate(180deg);
-}
-
-.player-card.position-left .card-content {
-  transform: rotate(-90deg);
-}
-
-.player-card.position-top-right .card-content {
-  transform: rotate(135deg);
-}
-
-.player-card.position-top-left .card-content {
-  transform: rotate(-135deg);
-}
-
-.player-card.position-bottom-right .card-content {
-  transform: rotate(45deg);
-}
-
-.player-card.position-bottom-left .card-content {
-  transform: rotate(-45deg);
+.rotate-btn:active {
+  transform: scale(0.9);
 }
 
 .card-content {
-  width: 100%;
+  flex: 1;
   transition: transform 0.3s ease;
 }
 
