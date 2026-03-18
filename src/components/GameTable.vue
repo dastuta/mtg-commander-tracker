@@ -241,7 +241,7 @@ export default {
     handleAction(action) {
       this.$emit('log-action', action)
       
-      if (action.type === 'damage' || action.type === 'heal') {
+      if (action.type === 'damage' || action.type === 'heal' || action.type === 'combat' || action.type === 'lifegain_damage' || action.type === 'lifegain_heal') {
         this.$emit('update-life', action.targetId, action.delta)
       } else if (action.type === 'poison') {
         this.$emit('update-poison', action.targetId, action.delta)

@@ -24,19 +24,31 @@
           :class="{ active: actionType === 'damage' }" 
           @click="actionType = 'damage'"
         >
-          Schaden
+          Damage
         </button>
         <button 
           :class="{ active: actionType === 'heal' }" 
           @click="actionType = 'heal'"
         >
-          Heilen
+          Heal
+        </button>
+        <button 
+          :class="{ active: actionType === 'combat' }" 
+          @click="actionType = 'combat'"
+        >
+          Combat
         </button>
         <button 
           :class="{ active: actionType === 'poison' }" 
           @click="actionType = 'poison'"
         >
-          Gift
+          Poison
+        </button>
+        <button 
+          :class="{ active: actionType === 'lifegain' }" 
+          @click="actionType = 'lifegain'"
+        >
+          Lifegain
         </button>
       </div>
 
@@ -51,7 +63,7 @@
 
       <div class="preset-actions">
         <button class="preset-btn" @click="applyPreset('commander')">Commander</button>
-        <button class="preset-btn" @click="applyPreset('toxic')">Toxisch</button>
+        <button class="preset-btn" @click="applyPreset('toxic')">Toxic</button>
       </div>
 
       <button class="btn-apply" @click="applyValue">
@@ -80,34 +92,101 @@ export default {
       this.value += delta
     },
     
+    getActionDelta(type) {
+      switch (type) {
+        case 'damage':
+        case 'combat':
+        case 'lifegain':
+          return -Math.abs(this.value)
+        case 'heal':
+          return Math.abs(this.value)
+        case 'poison':
+          return Math.abs(this.value)
+        default:
+          return this.value
+      }
+    },
+    
     applyQuick(amount) {
-      this.$emit('action', {
-        type: this.actionType,
-        targetId: this.targetPlayer.id,
-        targetName: this.targetPlayer.name,
-        delta: amount,
-        timestamp: Date.now()
-      })
+      const delta = this.getActionDelta(this.actionType)
+      
+      if (this.actionType === 'lifegain') {
+        this.$emit('action', {
+          type: 'lifegain_damage',
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: -Math.abs(amount),
+          timestamp: Date.now()
+        })
+        this.$emit('action', {
+          type: 'lifegain_heal',
+          targetId: this.sourcePlayer.id,
+          targetName: this.sourcePlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: Math.abs(amount),
+          timestamp: Date.now()
+        })
+      } else {
+        this.$emit('action', {
+          type: this.actionType,
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer?.id,
+          sourceName: this.sourcePlayer?.name,
+          delta,
+          timestamp: Date.now()
+        })
+      }
+      
       this.close()
     },
     
     applyPreset(preset) {
       let delta = 0
+      let type = this.actionType
+      
       if (preset === 'commander') {
         delta = -7
-        this.actionType = 'damage'
+        type = 'combat'
       } else if (preset === 'toxic') {
         delta = -1
-        this.actionType = 'poison'
+        type = 'poison'
       }
       
-      this.$emit('action', {
-        type: this.actionType,
-        targetId: this.targetPlayer.id,
-        targetName: this.targetPlayer.name,
-        delta,
-        timestamp: Date.now()
-      })
+      if (type === 'lifegain') {
+        this.$emit('action', {
+          type: 'lifegain_damage',
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: delta,
+          timestamp: Date.now()
+        })
+        this.$emit('action', {
+          type: 'lifegain_heal',
+          targetId: this.sourcePlayer.id,
+          targetName: this.sourcePlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: -delta,
+          timestamp: Date.now()
+        })
+      } else {
+        this.$emit('action', {
+          type,
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer?.id,
+          sourceName: this.sourcePlayer?.name,
+          delta,
+          timestamp: Date.now()
+        })
+      }
+      
       this.close()
     },
     
@@ -117,15 +196,42 @@ export default {
         return
       }
       
-      const delta = this.actionType === 'damage' ? -Math.abs(this.value) : this.value
+      if (this.actionType === 'lifegain') {
+        const damage = -Math.abs(this.value)
+        const heal = Math.abs(this.value)
+        
+        this.$emit('action', {
+          type: 'lifegain_damage',
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: damage,
+          timestamp: Date.now()
+        })
+        this.$emit('action', {
+          type: 'lifegain_heal',
+          targetId: this.sourcePlayer.id,
+          targetName: this.sourcePlayer.name,
+          sourceId: this.sourcePlayer.id,
+          sourceName: this.sourcePlayer.name,
+          delta: heal,
+          timestamp: Date.now()
+        })
+      } else {
+        const delta = this.getActionDelta(this.actionType)
+        
+        this.$emit('action', {
+          type: this.actionType,
+          targetId: this.targetPlayer.id,
+          targetName: this.targetPlayer.name,
+          sourceId: this.sourcePlayer?.id,
+          sourceName: this.sourcePlayer?.name,
+          delta,
+          timestamp: Date.now()
+        })
+      }
       
-      this.$emit('action', {
-        type: this.actionType,
-        targetId: this.targetPlayer.id,
-        targetName: this.targetPlayer.name,
-        delta,
-        timestamp: Date.now()
-      })
       this.close()
     },
     
@@ -156,7 +262,7 @@ export default {
   border-radius: 20px;
   padding: 1.5rem;
   width: 100%;
-  max-width: 350px;
+  max-width: 400px;
   border: 2px solid #c41e3a;
 }
 
@@ -233,18 +339,21 @@ export default {
 
 .action-type {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  justify-content: center;
 }
 
 .action-type button {
   flex: 1;
+  min-width: 70px;
   padding: 0.6rem;
   border: none;
   border-radius: 8px;
   background: #3a3a5a;
   color: #888;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 
@@ -252,6 +361,12 @@ export default {
   background: #c41e3a;
   color: #fff;
 }
+
+.action-type button:nth-child(1).active { background: #dc2626; }
+.action-type button:nth-child(2).active { background: #16a34a; }
+.action-type button:nth-child(3).active { background: #ea580c; }
+.action-type button:nth-child(4).active { background: #9333ea; }
+.action-type button:nth-child(5).active { background: #0891b2; }
 
 .quick-actions {
   display: flex;
