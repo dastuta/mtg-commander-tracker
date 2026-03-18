@@ -21,8 +21,7 @@ mtg-commander-tracker/
 │   │   ├── ActionPanel.vue    # [DEPRECATED] Altes Aktionspanel
 │   │   ├── GameEnd.vue        # Spielfinale mit Statistiken
 │   │   ├── GameTable.vue      # Haupt-Spielfeld mit Spielern
-│   │   ├── PlayerCard.vue     # Spieler-Karte mit Name, Commander, Stats
-│   │   ├── PlayerView.vue     # Tab-System für Life/Poison/CommanderDMG
+│   │   ├── PlayerCard.vue     # Spieler-Karte mit Tab-System für Views
 │   │   └── SetupScreen.vue    # Spiel-Einrichtung (Spieler hinzufügen)
 │   ├── App.vue                # Hauptkomponente, State-Management
 │   └── main.js
@@ -31,35 +30,83 @@ mtg-commander-tracker/
 └── index.html
 ```
 
-## Design Pattern: PlayerView Tab-System
+## Design Pattern: PlayerCard Inline-View-System
 
 ### Konzept
-Jede Spieler-Karte hat eine fokusierte Hauptanzeige für **Leben** mit seitlichen Buttons für **Gift** und **Commander-Damage**. Durch Klick auf die Buttons oder die Hauptanzeige wechselt der View.
+Jede Spieler-Karte hat:
+- **Linker Edge-Button**: Gift (lila)
+- **Rechter Edge-Button**: Commander Damage (lila)
+- **Mitte**: Hauptanzeige (Leben standardmäßig)
 
-### Implementierung (PlayerView.vue)
+Die Buttons sind AUSSERHALB des Wisch-Bereichs platziert, sodass sie die Wischgesten nicht triggern.
+
+### Layout
+```
+┌─────────────────────────────────────┐
+│         [Spieler Name]              │
+│        [Commander Name]             │
+├────┬─────────────────────────┬──────┤
+│Gift│                         │  CMD │
+│ 3  │      40 Leben          │  14  │
+│    │   (Wisch-Bereich)      │      │
+├────┴─────────────────────────┴──────┤
+│          "Ziehe für Aktionen"       │
+└─────────────────────────────────────┘
+```
+
+### View-Zustände
+1. **life** (Standard): Leben anzeigen, Wisch aktiv
+2. **poison**: Gift anzeigen, nur Zurück-Button, Wisch deaktiviert
+3. **commander**: Commander-Schaden pro Spieler, nur Zurück-Button, Wisch deaktiviert
+
+### Implementierung (PlayerCard.vue)
 
 ```vue
 <template>
-  <div class="player-view">
-    <!-- Linker Button: Gift -->
-    <button class="view-btn left" @click="showPoison">
-      <span class="btn-label">Gift</span>
-      <span class="btn-value">{{ player.poison }}</span>
-    </button>
-    
-    <!-- Hauptanzeige (klickbar für Life-View) -->
-    <div class="main-display" @click="showLife">
-      <!-- View wechselt basierend auf currentView -->
-      <div v-if="currentView === 'life'" class="life-display">...</div>
-      <div v-else-if="currentView === 'poison'" class="poison-display">...</div>
-      <div v-else-if="currentView === 'commander'" class="commander-display">...</div>
+  <div class="player-card" :class="{ 'view-mode': currentView !== 'life' }">
+    <!-- Header -->
+    <div class="player-header">...</div>
+
+    <div class="card-body">
+      <!-- Gift Button (außen links) -->
+      <button class="edge-btn poison-btn" @click.stop="switchToPoison">
+        <span>Gift</span>
+        <span>{{ player.poison }}</span>
+      </button>
+
+      <!-- Hauptbereich mit Views -->
+      <div 
+        class="main-area"
+        :class="{ 'no-drag': currentView !== 'life' }"
+        @mousedown="onDragStart"
+      >
+        <!-- Life View -->
+        <div v-if="currentView === 'life'" class="life-view">
+          <div class="stat-value">{{ player.life }}</div>
+        </div>
+
+        <!-- Poison View -->
+        <div v-else-if="currentView === 'poison'" class="poison-view">
+          <div class="stat-value">{{ player.poison }}</div>
+          <button class="back-btn" @click.stop="switchToLife">← Zurück</button>
+        </div>
+
+        <!-- Commander View -->
+        <div v-else-if="currentView === 'commander'" class="commander-view">
+          <!-- Liste pro Quelle -->
+          <div v-for="cd in commanderDamageList" :key="cd.sourceId" class="cmd-item">
+            {{ cd.sourceName }}: {{ cd.damage }}/20
+          </div>
+          <button class="back-btn" @click.stop="switchToLife">← Zurück</button>
+        </div>
+      </div>
+
+      <!-- CMD Button (außen rechts) -->
+      <button class="edge-btn cmd-btn" @click.stop="switchToCommander">
+        <span>CMD</span>
+        <span>{{ totalCommanderDamage }}</span>
+      </button>
     </div>
-    
-    <!-- Rechter Button: CommanderDMG -->
-    <button class="view-btn right" @click="showCommander">
-      <span class="btn-label">CMD</span>
-      <span class="btn-value">{{ totalCommanderDamage }}</span>
-    </button>
   </div>
 </template>
 
@@ -69,13 +116,23 @@ export default {
     return { currentView: 'life' }
   },
   methods: {
-    showLife() { this.currentView = 'life' },
-    showPoison() { this.currentView = 'poison' },
-    showCommander() { this.currentView = 'commander' }
+    switchToLife() { this.currentView = 'life' },
+    switchToPoison() { this.currentView = 'poison' },
+    switchToCommander() { this.currentView = 'commander' },
+    onDragStart(e) {
+      if (this.currentView !== 'life') return
+      // Wisch-Logik...
+    }
   }
 }
 </script>
 ```
+
+### Wichtige Punkte
+- `@click.stop` auf allen Buttons verhindert Event-Bubbling
+- `.no-drag` Klasse verhindert Wisch-Logik
+- Buttons sind `:disabled` wenn nicht im Life-View
+- Commander-Damage zeigt Schaden pro QUELLE, nicht Summe
 
 ### Erweiterung für neue Views
 
@@ -104,10 +161,8 @@ Um einen neuen View-Typ hinzuzufügen:
    ```
 
 ### Mögliche zukünftige Views
-- **CommanderDMG pro Spieler** - Detaillierte Ansicht aller Commander-Schaden-Quellen
 - **Schadenshistorie** - Letzte X Aktionen
 - **Mana/Resources** - Falls implementiert
-- **Commander-Schaden von spezifischem Spieler** - Detailansicht
 
 ## Spielregeln
 
