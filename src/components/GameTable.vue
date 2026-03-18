@@ -16,14 +16,15 @@
 
     <div class="players-grid" :class="`players-${players.length}`">
       <PlayerCard 
-        v-for="(player, index) in players" 
+        v-for="(player, index) in orderedPlayers" 
         :key="player.id"
         :player="player"
         :is-current="index === currentPlayerIndex"
         :players="players"
         :commander-damage="commanderDamage"
+        :table-position="getTablePosition(index)"
         @drag-start="onDragStart"
-        :ref="el => playerCards[index] = el"
+        :ref="el => playerCards[players.indexOf(player)] = el"
       />
     </div>
 
@@ -102,6 +103,25 @@ export default {
     nextPlayerName() {
       const nextIndex = (this.currentPlayerIndex + 1) % this.players.length
       return this.players[nextIndex]?.name || 'Nächster'
+    },
+    orderedPlayers() {
+      const count = this.players.length
+      if (count === 2) {
+        return [this.players[0], this.players[1]]
+      }
+      if (count === 3) {
+        return [this.players[1], this.players[0], this.players[2]]
+      }
+      if (count === 4) {
+        return [this.players[1], this.players[0], this.players[3], this.players[2]]
+      }
+      if (count === 5) {
+        return [this.players[1], this.players[0], this.players[4], this.players[2], this.players[3]]
+      }
+      if (count === 6) {
+        return [this.players[1], this.players[0], this.players[5], this.players[4], this.players[2], this.players[3]]
+      }
+      return this.players
     }
   },
   mounted() {
@@ -117,6 +137,17 @@ export default {
     document.removeEventListener('touchend', this.onTouchEnd)
   },
   methods: {
+    getTablePosition(index) {
+      const count = this.players.length
+      const positions = {
+        2: ['bottom', 'top'],
+        3: ['right', 'bottom', 'left'],
+        4: ['right', 'bottom', 'left', 'top'],
+        5: ['right', 'top-right', 'bottom', 'top-left', 'left'],
+        6: ['right', 'top-right', 'top-left', 'left', 'bottom-left', 'bottom-right']
+      }
+      return (positions[count] || positions[4])[index] || 'bottom'
+    },
     onDragStart({ player, element }) {
       this.isDragging = true
       this.dragSource = player
@@ -341,15 +372,32 @@ export default {
 .players-grid {
   flex: 1;
   display: grid;
-  gap: 1rem;
+  gap: 0.8rem;
   overflow-y: auto;
+  padding: 0.5rem;
 }
 
-.players-grid.players-2 { grid-template-columns: repeat(2, 1fr); }
-.players-grid.players-3 { grid-template-columns: repeat(2, 1fr); }
-.players-grid.players-4 { grid-template-columns: repeat(2, 1fr); }
-.players-grid.players-5 { grid-template-columns: repeat(2, 1fr); }
-.players-grid.players-6 { grid-template-columns: repeat(2, 1fr); }
+.players-grid.players-2 { 
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 1fr;
+}
+.players-grid.players-3 { 
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: auto auto;
+  justify-items: center;
+}
+.players-grid.players-4 { 
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+.players-grid.players-5 { 
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, auto);
+}
+.players-grid.players-6 { 
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
 
 @media (max-width: 600px) {
   .players-grid.players-2,
@@ -358,6 +406,7 @@ export default {
   .players-grid.players-5,
   .players-grid.players-6 {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 }
 

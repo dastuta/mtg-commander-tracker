@@ -1,92 +1,98 @@
 <template>
   <div 
     class="player-card" 
-    :class="{ 
-      current: isCurrent, 
-      dragging: isDragging && currentView === 'life',
-      validTarget: isValidTarget,
-      defeated: player.defeated,
-      'view-mode': currentView !== 'life'
-    }"
+    :class="[
+      `position-${tablePosition}`,
+      { 
+        current: isCurrent, 
+        dragging: isDragging && currentView === 'life',
+        validTarget: isValidTarget,
+        defeated: player.defeated,
+        'view-mode': currentView !== 'life'
+      }
+    ]"
     data-player-id="player.id"
   >
-    <div class="player-header">
-      <span class="player-name">{{ player.name }}</span>
-      <span class="player-commander">{{ player.commander }}</span>
-      <span v-if="player.defeated" class="defeat-badge">
-        DEFEATED ({{ player.defeatReason }})
-      </span>
-    </div>
-
-    <div class="card-body">
-      <button 
-        class="edge-btn poison-btn" 
-        @click.stop="switchToPoison"
-        :disabled="currentView !== 'life'"
-      >
-        <span class="edge-label">Gift</span>
-        <span class="edge-value">{{ player.poison }}</span>
-      </button>
-
-      <div 
-        class="main-area"
-        :class="{ 'no-drag': currentView !== 'life' }"
-        @mousedown="onDragStart"
-        @touchstart.prevent="onDragStart"
-      >
-        <div v-if="currentView === 'life'" class="life-view">
-          <div class="stat-label">Leben</div>
-          <div class="stat-value" :class="{ low: player.life <= 10, critical: player.life <= 5 }">
-            {{ player.life }}
-          </div>
-        </div>
-
-        <div v-else-if="currentView === 'poison'" class="poison-view">
-          <div class="stat-label">Gift</div>
-          <div class="stat-value" :class="{ warning: player.poison >= 7, critical: player.poison >= 10 }">
-            {{ player.poison }}
-          </div>
-          <button class="back-btn" @click.stop="switchToLife">
-            ← Zurück
-          </button>
-        </div>
-
-        <div v-else-if="currentView === 'commander'" class="commander-view">
-          <div class="stat-label">Commander Schaden</div>
-          <div class="commander-list">
-            <div v-for="cd in commanderDamageList" :key="cd.sourceId" class="cmd-item">
-              <span class="cmd-source">{{ cd.sourceName }}</span>
-              <div class="cmd-bar">
-                <div class="cmd-fill" :style="{ width: Math.min(100, (cd.damage / 20) * 100) + '%' }"></div>
-              </div>
-              <span class="cmd-value">{{ cd.damage }}/20</span>
-            </div>
-          </div>
-          <button class="back-btn" @click.stop="switchToLife">
-            ← Zurück
-          </button>
-        </div>
+    <div class="card-content">
+      <div class="player-header">
+        <span class="player-name">{{ player.name }}</span>
+        <span class="player-commander">{{ player.commander }}</span>
+        <span v-if="player.defeated" class="defeat-badge">
+          DEFEATED ({{ player.defeatReason }})
+        </span>
       </div>
 
-      <button 
-        class="edge-btn cmd-btn" 
-        @click.stop="switchToCommander"
-        :disabled="currentView !== 'life'"
-      >
-        <span class="edge-label">CMD</span>
-        <span class="edge-value">{{ totalCommanderDamage }}</span>
-      </button>
-    </div>
+      <div class="card-body">
+        <button 
+          class="edge-btn poison-btn" 
+          @click.stop="switchToPoison"
+          :disabled="currentView !== 'life'"
+        >
+          <span class="edge-label">Gift</span>
+          <span class="edge-value">{{ player.poison }}</span>
+        </button>
 
-    <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
-      {{ player.turnCount }} Züge
-    </div>
+        <div 
+          class="main-area"
+          :class="{ 'no-drag': currentView !== 'life' }"
+          @mousedown="onDragStart"
+          @touchstart.prevent="onDragStart"
+        >
+          <div v-if="currentView === 'life'" class="life-view">
+            <div class="stat-label">Leben</div>
+            <div class="stat-value" :class="{ low: player.life <= 10, critical: player.life <= 5 }">
+              {{ player.life }}
+            </div>
+          </div>
 
-    <div class="drag-hint" v-if="isCurrent && currentView === 'life'">
-      Ziehe für Aktionen
-    </div>
-    <div class="drag-hint" v-else-if="currentView === 'life'">
-      Ziehe für Aktionen
+          <div v-else-if="currentView === 'poison'" class="poison-view">
+            <div class="stat-label">Gift</div>
+            <div class="stat-value" :class="{ warning: player.poison >= 7, critical: player.poison >= 10 }">
+              {{ player.poison }}
+            </div>
+            <button class="back-btn" @click.stop="switchToLife">
+              ← Zurück
+            </button>
+          </div>
+
+          <div v-else-if="currentView === 'commander'" class="commander-view">
+            <div class="stat-label">Commander Schaden</div>
+            <div class="commander-list">
+              <div v-for="cd in commanderDamageList" :key="cd.sourceId" class="cmd-item">
+                <span class="cmd-source">{{ cd.sourceName }}</span>
+                <div class="cmd-bar">
+                  <div class="cmd-fill" :style="{ width: Math.min(100, (cd.damage / 20) * 100) + '%' }"></div>
+                </div>
+                <span class="cmd-value">{{ cd.damage }}/20</span>
+              </div>
+            </div>
+            <button class="back-btn" @click.stop="switchToLife">
+              ← Zurück
+            </button>
+          </div>
+        </div>
+
+        <button 
+          class="edge-btn cmd-btn" 
+          @click.stop="switchToCommander"
+          :disabled="currentView !== 'life'"
+        >
+          <span class="edge-label">CMD</span>
+          <span class="edge-value">{{ totalCommanderDamage }}</span>
+        </button>
+      </div>
+
+      <div class="card-footer">
+        <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
+          {{ player.turnCount }} Züge
+        </div>
+        <div class="drag-hint" v-if="isCurrent && currentView === 'life'">
+          Ziehe für Aktionen
+        </div>
+        <div class="drag-hint" v-else-if="currentView === 'life'">
+          Ziehe für Aktionen
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -98,7 +104,11 @@ export default {
     player: Object,
     isCurrent: Boolean,
     players: Array,
-    commanderDamage: Object
+    commanderDamage: Object,
+    tablePosition: {
+      type: String,
+      default: 'bottom'
+    }
   },
   emits: ['drag-start'],
   data() {
@@ -166,16 +176,61 @@ export default {
 .player-card {
   background: rgba(255,255,255,0.05);
   border-radius: 16px;
-  padding: 1rem;
+  padding: 0.5rem;
   border: 3px solid transparent;
   transition: all 0.2s;
   user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-card.position-bottom .card-content {
+  transform: rotate(0deg);
+}
+
+.player-card.position-right .card-content {
+  transform: rotate(90deg);
+}
+
+.player-card.position-top .card-content {
+  transform: rotate(180deg);
+}
+
+.player-card.position-left .card-content {
+  transform: rotate(-90deg);
+}
+
+.player-card.position-top-right .card-content {
+  transform: rotate(135deg);
+}
+
+.player-card.position-top-left .card-content {
+  transform: rotate(-135deg);
+}
+
+.player-card.position-bottom-right .card-content {
+  transform: rotate(45deg);
+}
+
+.player-card.position-bottom-left .card-content {
+  transform: rotate(-45deg);
+}
+
+.card-content {
+  width: 100%;
+  transition: transform 0.3s ease;
 }
 
 .player-card.current {
   border-color: #c41e3a;
-  background: rgba(196, 30, 58, 0.1);
   box-shadow: 0 0 20px rgba(196, 30, 58, 0.3);
+}
+
+.player-card.current .card-content {
+  background: rgba(196, 30, 58, 0.1);
+  border-radius: 12px;
+  padding: 0.8rem;
 }
 
 .player-card.view-mode {
@@ -199,31 +254,31 @@ export default {
 }
 
 .player-header {
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
   text-align: center;
 }
 
 .player-name {
   display: block;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: bold;
   color: #fff;
 }
 
 .player-commander {
   display: block;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #888;
-  margin-top: 0.3rem;
+  margin-top: 0.2rem;
 }
 
 .defeat-badge {
-  display: block;
-  margin-top: 0.5rem;
-  padding: 0.3rem 0.6rem;
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.2rem 0.5rem;
   background: #dc2626;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: bold;
   border-radius: 4px;
 }
@@ -231,8 +286,8 @@ export default {
 .card-body {
   display: flex;
   align-items: stretch;
-  gap: 0.5rem;
-  min-height: 100px;
+  gap: 0.4rem;
+  min-height: 80px;
 }
 
 .edge-btn {
@@ -240,9 +295,9 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 55px;
+  width: 50px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
@@ -272,13 +327,13 @@ export default {
 }
 
 .edge-label {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   text-transform: uppercase;
   opacity: 0.8;
 }
 
 .edge-value {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: bold;
 }
 
@@ -289,8 +344,8 @@ export default {
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,0.2);
-  border-radius: 12px;
-  padding: 0.5rem;
+  border-radius: 10px;
+  padding: 0.4rem;
   cursor: grab;
 }
 
@@ -314,14 +369,14 @@ export default {
 }
 
 .stat-label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #888;
   text-transform: uppercase;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.1rem;
 }
 
 .stat-value {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: bold;
   color: #4ade80;
   line-height: 1;
@@ -356,82 +411,78 @@ export default {
 .commander-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
   width: 100%;
-  max-height: 120px;
+  max-height: 80px;
   overflow-y: auto;
+  font-size: 0.75rem;
 }
 
 .cmd-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.4rem;
 }
 
 .cmd-source {
-  width: 50px;
+  width: 45px;
   text-align: left;
   color: #d8b4fe;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.7rem;
 }
 
 .cmd-bar {
   flex: 1;
-  height: 10px;
+  height: 8px;
   background: rgba(255,255,255,0.1);
-  border-radius: 5px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .cmd-fill {
   height: 100%;
   background: linear-gradient(90deg, #7c3aed, #9333ea);
-  border-radius: 5px;
+  border-radius: 4px;
   transition: width 0.3s;
 }
 
 .cmd-value {
-  width: 45px;
+  width: 40px;
   text-align: right;
   color: #888;
-}
-
-.no-damage {
-  color: #666;
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 0.5rem;
+  font-size: 0.65rem;
 }
 
 .back-btn {
-  margin-top: 0.8rem;
-  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.8rem;
   background: #3a3a5a;
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .back-btn:hover {
   background: #4a4a6a;
 }
 
-.turn-count {
+.card-footer {
+  margin-top: 0.5rem;
   text-align: center;
-  margin-top: 0.8rem;
-  font-size: 0.8rem;
+}
+
+.turn-count {
+  font-size: 0.75rem;
   color: #666;
 }
 
 .drag-hint {
-  text-align: center;
-  margin-top: 0.5rem;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #888;
   opacity: 0.7;
 }
