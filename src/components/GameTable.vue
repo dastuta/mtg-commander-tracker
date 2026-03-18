@@ -17,16 +17,16 @@
         :key="player.id"
         :player="player"
         :is-current="index === currentPlayerIndex"
+        :players="players"
+        :commander-damage="commanderDamage"
         @drag-start="onDragStart"
-        @drag-over="onDragOver"
-        @drag-end="onDragEnd"
         :ref="el => playerCards[index] = el"
       />
     </div>
 
     <div class="instructions">
       <p v-if="isDragging">Ziehe zu einem Spieler und lasse los</p>
-      <p v-else>Ziehe vom aktiven Spieler zu einem anderen für Aktionen</p>
+      <p v-else>Ziehe von einem Spieler zum Ziel für Aktionen</p>
     </div>
 
     <svg v-if="isDragging && dragLine" class="drag-line-svg">
@@ -71,9 +71,10 @@ export default {
     players: Array,
     currentPlayerIndex: Number,
     turnDuration: Number,
-    turnHistory: Array
+    turnHistory: Array,
+    commanderDamage: Object
   },
-  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action'],
+  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action', 'commander-damage'],
   data() {
     return {
       isDragging: false,
@@ -241,10 +242,18 @@ export default {
     handleAction(action) {
       this.$emit('log-action', action)
       
-      if (action.type === 'damage' || action.type === 'heal' || action.type === 'combat' || action.type === 'lifegain_damage' || action.type === 'lifegain_heal') {
+      if (action.type === 'damage' || action.type === 'heal' || action.type === 'combat' || action.type === 'commander' || action.type === 'lifegain_damage' || action.type === 'lifegain_heal') {
         this.$emit('update-life', action.targetId, action.delta)
       } else if (action.type === 'poison') {
         this.$emit('update-poison', action.targetId, action.delta)
+      }
+      
+      if (action.type === 'commander') {
+        this.$emit('commander-damage', {
+          sourceId: action.sourceId,
+          targetId: action.targetId,
+          damage: Math.abs(action.delta)
+        })
       }
       
       this.closeActionMenu()

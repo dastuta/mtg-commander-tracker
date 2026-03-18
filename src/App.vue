@@ -13,11 +13,13 @@
         :players="players" 
         :current-player-index="currentPlayerIndex" 
         :turn-duration="turnDuration" 
-        :turn-history="turnHistory" 
+        :turn-history="turnHistory"
+        :commander-damage="commanderDamage"
         @next-turn="nextTurn" 
         @update-life="updateLife" 
         @update-poison="updatePoison"
         @log-action="logAction"
+        @commander-damage="handleCommanderDamage"
         @end-game="endGame" />
       <GameEnd v-else-if="gameState === 'ended'" :players="players" :turn-history="turnHistory" @new-game="resetGame" @save-game="saveGame" />
     </main>
@@ -41,6 +43,7 @@ export default {
     const turnDuration = ref(0)
     const turnHistory = ref([])
     const savedGames = ref([])
+    const commanderDamage = ref({})
 
     let timerInterval = null
 
@@ -53,8 +56,12 @@ export default {
         commander: p.commander,
         life: 40,
         poison: 0,
-        turnCount: 0
+        turnCount: 0,
+        defeated: false,
+        defeatReason: null,
+        defeatedBy: null
       }))
+      commanderDamage.value = {}
       currentPlayerIndex.value = 0
       turnStartTime.value = Date.now()
       turnHistory.value = [{
@@ -112,7 +119,13 @@ export default {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
         player.life += delta
-        if (player.life < 0) player.life = 0
+        if (player.life <= 0) {
+          player.life = 0
+          if (!player.defeated) {
+            player.defeated = true
+            player.defeatReason = 'life'
+          }
+        }
         saveToStorage()
       }
     }
@@ -121,8 +134,32 @@ export default {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
         player.poison = Math.max(0, player.poison + delta)
+        if (player.poison >= 10) {
+          player.defeated = true
+          player.defeatReason = 'poison'
+        }
         saveToStorage()
       }
+    }
+
+    const handleCommanderDamage = ({ sourceId, targetId, damage }) => {
+      const key = `${sourceId}-${targetId}`
+      if (!commanderDamage.value[key]) {
+        commanderDamage.value[key] = 0
+      }
+      commanderDamage.value[key] += damage
+      
+      if (commanderDamage.value[key] >= 20) {
+        const target = players.value.find(p => p.id === targetId)
+        const source = players.value.find(p => p.id === sourceId)
+        if (target && !target.defeated) {
+          target.defeated = true
+          target.defeatReason = 'commander'
+          target.defeatedBy = source?.name || 'Commander'
+        }
+      }
+      
+      saveToStorage()
     }
 
     const logAction = (action) => {
@@ -153,6 +190,7 @@ export default {
       currentPlayerIndex.value = 0
       turnDuration.value = 0
       turnHistory.value = []
+      commanderDamage.value = {}
       gameState.value = 'setup'
       localStorage.removeItem('mtg-commander-game')
     }
@@ -185,7 +223,8 @@ export default {
       localStorage.setItem('mtg-commander-game', JSON.stringify({
         players: players.value,
         turnHistory: turnHistory.value,
-        currentPlayerIndex: currentPlayerIndex.value
+        currentPlayerIndex: currentPlayerIndex.value,
+        commanderDamage: commanderDamage.value
       }))
     }
 
@@ -202,6 +241,7 @@ export default {
           players.value = data.players
           turnHistory.value = data.turnHistory || []
           currentPlayerIndex.value = data.currentPlayerIndex || 0
+          commanderDamage.value = data.commanderDamage || {}
           turnStartTime.value = Date.now()
           gameState.value = 'playing'
           startTimer()
@@ -224,11 +264,13 @@ export default {
       turnDuration,
       turnHistory,
       savedGames,
+      commanderDamage,
       startGame,
       nextTurn,
       updateLife,
       updatePoison,
       logAction,
+      handleCommanderDamage,
       endGame,
       resetGame,
       saveGame,

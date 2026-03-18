@@ -27,16 +27,22 @@
           Damage
         </button>
         <button 
-          :class="{ active: actionType === 'heal' }" 
-          @click="actionType = 'heal'"
-        >
-          Heal
-        </button>
-        <button 
           :class="{ active: actionType === 'combat' }" 
           @click="actionType = 'combat'"
         >
           Combat
+        </button>
+        <button 
+          :class="{ active: actionType === 'commander' }" 
+          @click="actionType = 'commander'"
+        >
+          Commander
+        </button>
+        <button 
+          :class="{ active: actionType === 'heal' }" 
+          @click="actionType = 'heal'"
+        >
+          Heal
         </button>
         <button 
           :class="{ active: actionType === 'poison' }" 
@@ -59,11 +65,6 @@
         <button @click="applyQuick(1)">+1</button>
         <button @click="applyQuick(5)">+5</button>
         <button @click="applyQuick(10)">+10</button>
-      </div>
-
-      <div class="preset-actions">
-        <button class="preset-btn" @click="applyPreset('commander')">Commander</button>
-        <button class="preset-btn" @click="applyPreset('toxic')">Toxic</button>
       </div>
 
       <button class="btn-apply" @click="applyValue">
@@ -92,23 +93,8 @@ export default {
       this.value += delta
     },
     
-    getActionDelta(type) {
-      switch (type) {
-        case 'damage':
-        case 'combat':
-        case 'lifegain':
-          return -Math.abs(this.value)
-        case 'heal':
-          return Math.abs(this.value)
-        case 'poison':
-          return Math.abs(this.value)
-        default:
-          return this.value
-      }
-    },
-    
     applyQuick(amount) {
-      const delta = this.getActionDelta(this.actionType)
+      const delta = this.getActionDelta()
       
       if (this.actionType === 'lifegain') {
         this.$emit('action', {
@@ -144,50 +130,21 @@ export default {
       this.close()
     },
     
-    applyPreset(preset) {
-      let delta = 0
-      let type = this.actionType
-      
-      if (preset === 'commander') {
-        delta = -7
-        type = 'combat'
-      } else if (preset === 'toxic') {
-        delta = -1
-        type = 'poison'
+    getActionDelta() {
+      const absValue = Math.abs(this.value)
+      switch (this.actionType) {
+        case 'damage':
+        case 'combat':
+        case 'commander':
+        case 'lifegain':
+          return -absValue
+        case 'heal':
+          return absValue
+        case 'poison':
+          return absValue
+        default:
+          return this.value
       }
-      
-      if (type === 'lifegain') {
-        this.$emit('action', {
-          type: 'lifegain_damage',
-          targetId: this.targetPlayer.id,
-          targetName: this.targetPlayer.name,
-          sourceId: this.sourcePlayer.id,
-          sourceName: this.sourcePlayer.name,
-          delta: delta,
-          timestamp: Date.now()
-        })
-        this.$emit('action', {
-          type: 'lifegain_heal',
-          targetId: this.sourcePlayer.id,
-          targetName: this.sourcePlayer.name,
-          sourceId: this.sourcePlayer.id,
-          sourceName: this.sourcePlayer.name,
-          delta: -delta,
-          timestamp: Date.now()
-        })
-      } else {
-        this.$emit('action', {
-          type,
-          targetId: this.targetPlayer.id,
-          targetName: this.targetPlayer.name,
-          sourceId: this.sourcePlayer?.id,
-          sourceName: this.sourcePlayer?.name,
-          delta,
-          timestamp: Date.now()
-        })
-      }
-      
-      this.close()
     },
     
     applyValue() {
@@ -219,7 +176,7 @@ export default {
           timestamp: Date.now()
         })
       } else {
-        const delta = this.getActionDelta(this.actionType)
+        const delta = this.getActionDelta()
         
         this.$emit('action', {
           type: this.actionType,
@@ -347,13 +304,13 @@ export default {
 
 .action-type button {
   flex: 1;
-  min-width: 70px;
+  min-width: 60px;
   padding: 0.6rem;
   border: none;
   border-radius: 8px;
   background: #3a3a5a;
   color: #888;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   cursor: pointer;
 }
 
@@ -363,10 +320,11 @@ export default {
 }
 
 .action-type button:nth-child(1).active { background: #dc2626; }
-.action-type button:nth-child(2).active { background: #16a34a; }
-.action-type button:nth-child(3).active { background: #ea580c; }
-.action-type button:nth-child(4).active { background: #9333ea; }
+.action-type button:nth-child(2).active { background: #ea580c; }
+.action-type button:nth-child(3).active { background: #9333ea; }
+.action-type button:nth-child(4).active { background: #16a34a; }
 .action-type button:nth-child(5).active { background: #0891b2; }
+.action-type button:nth-child(6).active { background: #0891b2; }
 
 .quick-actions {
   display: flex;
@@ -398,27 +356,6 @@ export default {
 
 .quick-actions button:active {
   transform: scale(0.95);
-}
-
-.preset-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.preset-btn {
-  flex: 1;
-  padding: 0.6rem;
-  border: 2px solid #3b82f6;
-  border-radius: 8px;
-  background: transparent;
-  color: #93c5fd;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.preset-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
 }
 
 .btn-apply {

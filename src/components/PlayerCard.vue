@@ -4,7 +4,8 @@
     :class="{ 
       current: isCurrent, 
       dragging: isDragging,
-      validTarget: isValidTarget
+      validTarget: isValidTarget,
+      defeated: player.defeated
     }"
     data-player-id="player.id"
     @mousedown="onDragStart"
@@ -13,6 +14,10 @@
     <div class="player-header">
       <span class="player-name">{{ player.name }}</span>
       <span class="player-commander">{{ player.commander }}</span>
+      <span v-if="player.defeated" class="defeat-badge">
+        DEFEATED
+        <span class="defeat-reason">({{ player.defeatReason }})</span>
+      </span>
     </div>
     
     <div class="player-stats">
@@ -27,12 +32,21 @@
       </div>
     </div>
 
-    <div class="turn-count" v-if="player.turnCount > 0">
+    <div class="commander-damage-list" v-if="commanderDamageList.length > 0">
+      <div v-for="cd in commanderDamageList" :key="cd.source" class="commander-damage-item">
+        {{ cd.source }}: {{ cd.damage }}/20
+      </div>
+    </div>
+
+    <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated">
       {{ player.turnCount }} Züge
     </div>
 
-    <div class="drag-hint" v-if="isCurrent">
-      Ziehe zu einem Spieler
+    <div class="drag-hint" v-if="isCurrent && !player.defeated">
+      Dein Zug
+    </div>
+    <div class="drag-hint opponent" v-else-if="!player.defeated">
+      Ziehe für Aktionen
     </div>
   </div>
 </template>
@@ -42,7 +56,9 @@ export default {
   name: 'PlayerCard',
   props: {
     player: Object,
-    isCurrent: Boolean
+    isCurrent: Boolean,
+    players: Array,
+    commanderDamage: Object
   },
   emits: ['drag-start'],
   data() {
@@ -52,13 +68,31 @@ export default {
       cardElement: null
     }
   },
+  computed: {
+    commanderDamageList() {
+      if (!this.commanderDamage) return []
+      
+      const list = []
+      for (const [key, damage] of Object.entries(this.commanderDamage)) {
+        const [sourceId, targetId] = key.split('-').map(Number)
+        if (targetId === this.player.id) {
+          const sourcePlayer = this.players?.find(p => p.id === sourceId)
+          if (sourcePlayer) {
+            list.push({
+              source: sourcePlayer.name,
+              damage
+            })
+          }
+        }
+      }
+      return list
+    }
+  },
   mounted() {
     this.cardElement = this.$el
   },
   methods: {
     onDragStart(e) {
-      if (!this.isCurrent) return
-      
       e.preventDefault()
       this.isDragging = true
       this.$emit('drag-start', {
@@ -86,10 +120,15 @@ export default {
   border-color: #c41e3a;
   background: rgba(196, 30, 58, 0.1);
   box-shadow: 0 0 20px rgba(196, 30, 58, 0.3);
+}
+
+.player-card.current,
+.player-card:not(.current) {
   cursor: grab;
 }
 
-.player-card.current:active {
+.player-card.current:active,
+.player-card:not(.current):active {
   cursor: grabbing;
 }
 
@@ -101,6 +140,47 @@ export default {
 .player-card.validTarget {
   border-color: #4ade80;
   background: rgba(74, 222, 128, 0.15);
+}
+
+.player-card.defeated {
+  opacity: 0.5;
+  filter: grayscale(0.8);
+}
+
+.player-card.defeated .stat-value {
+  text-decoration: line-through;
+}
+
+.defeat-badge {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.defeat-reason {
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+.commander-damage-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+}
+
+.commander-damage-item {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  background: rgba(147, 51, 234, 0.3);
+  color: #d8b4fe;
+  border-radius: 4px;
 }
 
 .player-header {
@@ -177,5 +257,9 @@ export default {
   font-size: 0.7rem;
   color: #c41e3a;
   opacity: 0.7;
+}
+
+.drag-hint.opponent {
+  color: #888;
 }
 </style>
