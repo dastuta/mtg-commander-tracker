@@ -13,7 +13,7 @@
     ]"
     data-player-id="player.id"
   >
-    <button class="rotate-btn" @click.stop="rotateLeft">↶</button>
+    <button class="rotate-btn rotate-left" @click.stop="rotateLeft">↶</button>
     
     <div class="card-content">
       <div class="player-header">
@@ -97,7 +97,7 @@
       </div>
     </div>
     
-    <button class="rotate-btn" @click.stop="rotateRight">↷</button>
+    <button class="rotate-btn rotate-right" @click.stop="rotateRight">↷</button>
   </div>
 </template>
 
@@ -192,17 +192,25 @@ export default {
   gap: 0.3rem;
 }
 
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
 .player-card.rotation-0 .card-content { transform: rotate(0deg); }
 .player-card.rotation-90 .card-content { transform: rotate(90deg); }
 .player-card.rotation-180 .card-content { transform: rotate(180deg); }
 .player-card.rotation-270 .card-content { transform: rotate(270deg); }
 
 .rotate-btn {
-  width: 30px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.1);
-  color: #888;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #aaa;
   font-size: 1rem;
   cursor: pointer;
   display: flex;
@@ -210,20 +218,16 @@ export default {
   justify-content: center;
   transition: all 0.2s;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .rotate-btn:hover {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.25);
   color: #fff;
 }
 
 .rotate-btn:active {
   transform: scale(0.9);
-}
-
-.card-content {
-  flex: 1;
-  transition: transform 0.3s ease;
 }
 
 .player-card.current {

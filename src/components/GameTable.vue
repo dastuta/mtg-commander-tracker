@@ -373,7 +373,6 @@ export default {
 }
 
 @media (min-width: 900px) and (min-height: 600px) {
-  .players-grid.players-4,
   .players-grid.players-5,
   .players-grid.players-6 {
     grid-template-columns: repeat(3, 1fr);
