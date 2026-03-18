@@ -18,19 +18,24 @@
         :player="player"
         :is-current="index === currentPlayerIndex"
         :is-active-player="index === currentPlayerIndex"
-        @update-life="(delta) => $emit('update-life', player.id, delta)"
-        @update-poison="(delta) => $emit('update-poison', player.id, delta)"
+        :players="players"
+        :current-player-index="currentPlayerIndex"
+        @open-action-menu="openActionMenu"
+        @close-action-menu="closeActionMenu"
       />
     </div>
 
-    <div class="action-panel">
-      <ActionPanel 
-        :current-player="currentPlayer"
-        :current-player-index="currentPlayerIndex"
-        :players="players"
-        @next-turn="$emit('next-turn', $event)"
-      />
+    <div class="instructions">
+      <p>Wische auf dem aktiven Spieler nach links/rechts auf einen Gegner für Schadensmenü</p>
     </div>
+
+    <ActionMenu 
+      v-if="actionMenu.open"
+      :target-player="actionMenu.target"
+      :source-player="actionMenu.source"
+      @close="closeActionMenu"
+      @action="handleAction"
+    />
 
     <button class="btn btn-end" @click="$emit('end-game')">
       Spiel beenden
@@ -39,21 +44,21 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import PlayerCard from './PlayerCard.vue'
-import ActionPanel from './ActionPanel.vue'
+import ActionMenu from './ActionMenu.vue'
 
 export default {
   name: 'GameTable',
-  components: { PlayerCard, ActionPanel },
+  components: { PlayerCard, ActionMenu },
   props: {
     players: Array,
     currentPlayerIndex: Number,
     turnDuration: Number,
     turnHistory: Array
   },
-  emits: ['next-turn', 'update-life', 'update-poison', 'end-game'],
-  setup(props) {
+  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action'],
+  setup(props, { emit }) {
     const currentPlayer = computed(() => props.players[props.currentPlayerIndex])
     
     const currentTurnNumber = computed(() => {
@@ -66,10 +71,46 @@ export default {
       return `${minutes}:${seconds.toString().padStart(2, '0')}`
     })
 
+    const actionMenu = reactive({
+      open: false,
+      target: null,
+      source: null
+    })
+
+    const openActionMenu = ({ target, source }) => {
+      actionMenu.open = true
+      actionMenu.target = target
+      actionMenu.source = source
+    }
+
+    const closeActionMenu = () => {
+      actionMenu.open = false
+      actionMenu.target = null
+      actionMenu.source = null
+    }
+
+    const handleAction = (action) => {
+      emit('log-action', action)
+      
+      if (action.type === 'life' || action.type === 'commander' || action.type === 'toxic') {
+        emit('update-life', action.targetId, action.delta)
+      } else if (action.type === 'poison') {
+        emit('update-poison', action.targetId, action.delta)
+      } else if (action.type === 'custom') {
+        emit('update-life', action.targetId, action.delta)
+      }
+      
+      closeActionMenu()
+    }
+
     return {
       currentPlayer,
       currentTurnNumber,
-      formattedTime
+      formattedTime,
+      actionMenu,
+      openActionMenu,
+      closeActionMenu,
+      handleAction
     }
   }
 }
@@ -159,16 +200,26 @@ export default {
   }
 }
 
-.action-panel {
-  margin-top: 1rem;
+.instructions {
+  text-align: center;
+  padding: 0.8rem;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.instructions p {
+  font-size: 0.8rem;
+  color: #666;
 }
 
 .btn-end {
-  margin-top: 1rem;
+  margin-top: auto;
   background: transparent;
   border: 2px solid #666;
   color: #888;
   width: 100%;
+  padding: 1rem;
 }
 
 .btn-end:hover {

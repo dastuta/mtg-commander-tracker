@@ -9,7 +9,16 @@
 
     <main class="main">
       <SetupScreen v-if="gameState === 'setup'" @start-game="startGame" :saved-games="savedGames" />
-      <GameTable v-else-if="gameState === 'playing'" :players="players" :current-player-index="currentPlayerIndex" :turn-duration="turnDuration" :turn-history="turnHistory" @next-turn="nextTurn" @update-life="updateLife" @update-poison="updatePoison" @end-game="endGame" />
+      <GameTable v-else-if="gameState === 'playing'" 
+        :players="players" 
+        :current-player-index="currentPlayerIndex" 
+        :turn-duration="turnDuration" 
+        :turn-history="turnHistory" 
+        @next-turn="nextTurn" 
+        @update-life="updateLife" 
+        @update-poison="updatePoison"
+        @log-action="logAction"
+        @end-game="endGame" />
       <GameEnd v-else-if="gameState === 'ended'" :players="players" :turn-history="turnHistory" @new-game="resetGame" @save-game="saveGame" />
     </main>
   </div>
@@ -103,15 +112,7 @@ export default {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
         player.life += delta
-        const currentTurn = turnHistory.value[turnHistory.value.length - 1]
-        currentTurn.actions.push({
-          type: 'life',
-          playerId,
-          playerName: player.name,
-          delta,
-          newValue: player.life,
-          timestamp: Date.now()
-        })
+        if (player.life < 0) player.life = 0
         saveToStorage()
       }
     }
@@ -119,15 +120,20 @@ export default {
     const updatePoison = (playerId, delta) => {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
-        player.poison += delta
-        const currentTurn = turnHistory.value[turnHistory.value.length - 1]
+        player.poison = Math.max(0, player.poison + delta)
+        saveToStorage()
+      }
+    }
+
+    const logAction = (action) => {
+      const currentTurn = turnHistory.value[turnHistory.value.length - 1]
+      if (currentTurn) {
         currentTurn.actions.push({
-          type: 'poison',
-          playerId,
-          playerName: player.name,
-          delta,
-          newValue: player.poison,
-          timestamp: Date.now()
+          type: action.type,
+          playerId: action.targetId,
+          playerName: action.targetName,
+          delta: action.delta,
+          timestamp: action.timestamp
         })
         saveToStorage()
       }
@@ -135,6 +141,8 @@ export default {
 
     const endGame = () => {
       stopTimer()
+      const currentTurn = turnHistory.value[turnHistory.value.length - 1]
+      currentTurn.duration = turnDuration.value
       gameState.value = 'ended'
       saveToStorage()
     }
@@ -220,6 +228,7 @@ export default {
       nextTurn,
       updateLife,
       updatePoison,
+      logAction,
       endGame,
       resetGame,
       saveGame,
@@ -230,6 +239,28 @@ export default {
 </script>
 
 <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+}
+#app {
+  height: 100%;
+}
+</style>
+
+<style scoped>
 .app {
   height: 100%;
   display: flex;
