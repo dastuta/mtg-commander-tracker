@@ -1,45 +1,42 @@
 <template>
   <div 
     class="player-card" 
-    :class="[
-      `rotation-${playerRotation}`,
-      { 
-        current: isCurrent, 
-        dragging: isDragging && currentView === 'life',
-        validTarget: isValidTarget,
-        defeated: player.defeated,
-        'view-mode': currentView !== 'life'
-      }
-    ]"
+    :class="{ 
+      current: isCurrent, 
+      dragging: isDragging && currentView === 'life',
+      validTarget: isValidTarget,
+      defeated: player.defeated,
+      'view-mode': currentView !== 'life'
+    }"
     data-player-id="player.id"
   >
     <button class="rotate-btn rotate-left" @click.stop="rotateLeft">↶</button>
-    
-    <div class="card-content">
-      <div class="player-header">
-        <span class="player-name">{{ player.name }}</span>
-        <span class="player-commander">{{ player.commander }}</span>
-        <span v-if="player.defeated" class="defeat-badge">
-          DEFEATED ({{ player.defeatReason }})
-        </span>
-      </div>
 
-      <div class="card-body">
-        <button 
-          class="edge-btn poison-btn" 
-          @click.stop="switchToPoison"
-          :disabled="currentView !== 'life'"
-        >
-          <span class="edge-label">Gift</span>
-          <span class="edge-value">{{ player.poison }}</span>
-        </button>
+    <div class="card-body">
+      <button 
+        class="edge-btn poison-btn" 
+        @click.stop="switchToPoison"
+        :disabled="currentView !== 'life'"
+      >
+        <span class="edge-label">Gift</span>
+        <span class="edge-value">{{ player.poison }}</span>
+      </button>
 
-        <div 
-          class="main-area"
-          :class="{ 'no-drag': currentView !== 'life' }"
-          @mousedown="onDragStart"
-          @touchstart.prevent="onDragStart"
-        >
+      <div 
+        class="main-area"
+        :class="{ 'no-drag': currentView !== 'life' }"
+        @mousedown="onDragStart"
+        @touchstart.prevent="onDragStart"
+      >
+        <div class="text-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
+          <div class="player-header">
+            <span class="player-name">{{ player.name }}</span>
+            <span class="player-commander">{{ player.commander }}</span>
+            <span v-if="player.defeated" class="defeat-badge">
+              DEFEATED ({{ player.defeatReason }})
+            </span>
+          </div>
+
           <div v-if="currentView === 'life'" class="life-view">
             <div class="stat-label">Leben</div>
             <div class="stat-value" :class="{ low: player.life <= 10, critical: player.life <= 5 }">
@@ -72,31 +69,31 @@
               ← Zurück
             </button>
           </div>
-        </div>
 
-        <button 
-          class="edge-btn cmd-btn" 
-          @click.stop="switchToCommander"
-          :disabled="currentView !== 'life'"
-        >
-          <span class="edge-label">CMD</span>
-          <span class="edge-value">{{ totalCommanderDamage }}</span>
-        </button>
+          <div class="card-footer">
+            <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
+              {{ player.turnCount }} Züge
+            </div>
+            <div class="drag-hint" v-if="isCurrent && currentView === 'life'">
+              Ziehe für Aktionen
+            </div>
+            <div class="drag-hint" v-else-if="currentView === 'life'">
+              Ziehe für Aktionen
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="card-footer">
-        <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
-          {{ player.turnCount }} Züge
-        </div>
-        <div class="drag-hint" v-if="isCurrent && currentView === 'life'">
-          Ziehe für Aktionen
-        </div>
-        <div class="drag-hint" v-else-if="currentView === 'life'">
-          Ziehe für Aktionen
-        </div>
-      </div>
+      <button 
+        class="edge-btn cmd-btn" 
+        @click.stop="switchToCommander"
+        :disabled="currentView !== 'life'"
+      >
+        <span class="edge-label">CMD</span>
+        <span class="edge-value">{{ totalCommanderDamage }}</span>
+      </button>
     </div>
-    
+
     <button class="rotate-btn rotate-right" @click.stop="rotateRight">↷</button>
   </div>
 </template>
@@ -192,17 +189,70 @@ export default {
   gap: 0.3rem;
 }
 
-.card-content {
+.card-body {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.main-area {
   flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+  cursor: grab;
+  overflow: hidden;
+}
+
+.main-area:active:not(.no-drag) {
+  cursor: grabbing;
+}
+
+.main-area.no-drag {
+  cursor: default;
+}
+
+.text-content {
+  display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5rem;
   transition: transform 0.3s ease;
 }
 
-.player-card.rotation-0 .card-content { transform: rotate(0deg); }
-.player-card.rotation-90 .card-content { transform: rotate(90deg); }
-.player-card.rotation-180 .card-content { transform: rotate(180deg); }
-.player-card.rotation-270 .card-content { transform: rotate(270deg); }
+.player-card.current {
+  border-color: #c41e3a;
+  box-shadow: 0 0 20px rgba(196, 30, 58, 0.3);
+}
+
+.player-card.current .main-area {
+  background: rgba(196, 30, 58, 0.1);
+}
+
+.player-card.view-mode {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.player-card.dragging {
+  transform: scale(1.02);
+  box-shadow: 0 0 30px rgba(196, 30, 58, 0.5);
+}
+
+.player-card.validTarget {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.player-card.defeated {
+  opacity: 0.5;
+  filter: grayscale(0.8);
+}
 
 .rotate-btn {
   width: 32px;
@@ -228,74 +278,6 @@ export default {
 
 .rotate-btn:active {
   transform: scale(0.9);
-}
-
-.player-card.current {
-  border-color: #c41e3a;
-  box-shadow: 0 0 20px rgba(196, 30, 58, 0.3);
-}
-
-.player-card.current .card-content {
-  background: rgba(196, 30, 58, 0.1);
-  border-radius: 12px;
-  padding: 0.8rem;
-}
-
-.player-card.view-mode {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.player-card.dragging {
-  transform: scale(1.02);
-  box-shadow: 0 0 30px rgba(196, 30, 58, 0.5);
-}
-
-.player-card.validTarget {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.15);
-}
-
-.player-card.defeated {
-  opacity: 0.5;
-  filter: grayscale(0.8);
-}
-
-.player-header {
-  margin-bottom: 0.6rem;
-  text-align: center;
-}
-
-.player-name {
-  display: block;
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #fff;
-}
-
-.player-commander {
-  display: block;
-  font-size: 0.85rem;
-  color: #888;
-  margin-top: 0.2rem;
-}
-
-.defeat-badge {
-  display: inline-block;
-  margin-top: 0.3rem;
-  padding: 0.2rem 0.5rem;
-  background: #dc2626;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border-radius: 4px;
-}
-
-.card-body {
-  display: flex;
-  align-items: stretch;
-  gap: 0.4rem;
-  min-height: 80px;
 }
 
 .edge-btn {
@@ -345,24 +327,34 @@ export default {
   font-weight: bold;
 }
 
-.main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.2);
-  border-radius: 10px;
-  padding: 0.4rem;
-  cursor: grab;
+.player-header {
+  text-align: center;
+  margin-bottom: 0.4rem;
 }
 
-.main-area:active:not(.no-drag) {
-  cursor: grabbing;
+.player-name {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #fff;
 }
 
-.main-area.no-drag {
-  cursor: default;
+.player-commander {
+  display: block;
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.2rem;
+}
+
+.defeat-badge {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border-radius: 4px;
 }
 
 .life-view,
@@ -373,18 +365,17 @@ export default {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100%;
 }
 
 .stat-label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: #888;
   text-transform: uppercase;
   margin-bottom: 0.1rem;
 }
 
 .stat-value {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   font-weight: bold;
   color: #4ade80;
   line-height: 1;
@@ -419,60 +410,60 @@ export default {
 .commander-list {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
   width: 100%;
-  max-height: 80px;
+  max-height: 70px;
   overflow-y: auto;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
 }
 
 .cmd-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .cmd-source {
-  width: 45px;
+  width: 40px;
   text-align: left;
   color: #d8b4fe;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
 }
 
 .cmd-bar {
   flex: 1;
-  height: 8px;
+  height: 6px;
   background: rgba(255,255,255,0.1);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .cmd-fill {
   height: 100%;
   background: linear-gradient(90deg, #7c3aed, #9333ea);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: width 0.3s;
 }
 
 .cmd-value {
-  width: 40px;
+  width: 35px;
   text-align: right;
   color: #888;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
 }
 
 .back-btn {
-  margin-top: 0.5rem;
-  padding: 0.4rem 0.8rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.6rem;
   background: #3a3a5a;
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 .back-btn:hover {
@@ -480,17 +471,17 @@ export default {
 }
 
 .card-footer {
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
   text-align: center;
 }
 
 .turn-count {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #666;
 }
 
 .drag-hint {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: #888;
   opacity: 0.7;
 }
