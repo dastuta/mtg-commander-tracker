@@ -136,7 +136,7 @@ export default {
           sourceName: opponent.name,
           damage
         }
-      }).sort((a, b) => b.damage - a.damage)
+      })
     },
     totalCommanderDamage() {
       return this.commanderDamageList.reduce((sum, cd) => sum + cd.damage, 0)
