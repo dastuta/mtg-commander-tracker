@@ -18,8 +18,10 @@
         @click.stop="switchToPoison"
         :disabled="currentView !== 'life'"
       >
-        <span class="edge-label">Gift</span>
-        <span class="edge-value">{{ player.poison }}</span>
+        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
+          <span class="edge-label">Gift</span>
+          <span class="edge-value">{{ player.poison }}</span>
+        </div>
       </button>
 
       <div 
@@ -89,8 +91,10 @@
         @click.stop="switchToCommander"
         :disabled="currentView !== 'life'"
       >
-        <span class="edge-label">CMD</span>
-        <span class="edge-value">{{ totalCommanderDamage }}</span>
+        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
+          <span class="edge-label">CMD</span>
+          <span class="edge-value">{{ totalCommanderDamage }}</span>
+        </div>
       </button>
     </div>
 
@@ -291,6 +295,15 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
 }
 
 .edge-btn:disabled {
@@ -325,6 +338,7 @@ export default {
 .edge-value {
   font-size: 1.1rem;
   font-weight: bold;
+  line-height: 1;
 }
 
 .player-header {
