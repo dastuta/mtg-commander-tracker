@@ -15,14 +15,24 @@
         :turn-duration="turnDuration" 
         :turn-history="turnHistory"
         :commander-damage="commanderDamage"
+        :undo-count="actionHistory.length"
         @next-turn="nextTurn" 
-        @update-life="updateLife" 
-        @update-poison="updatePoison"
+        @update-life="(id, delta) => updateLife(id, delta)" 
+        @update-poison="(id, delta) => updatePoison(id, delta)"
         @log-action="logAction"
         @commander-damage="handleCommanderDamage"
+        @open-menu="menuOpen = true"
         @end-game="endGame" />
       <GameEnd v-else-if="gameState === 'ended'" :players="players" :turn-history="turnHistory" @new-game="resetGame" @save-game="saveGame" />
     </main>
+
+    <GameMenu 
+      v-if="menuOpen" 
+      :undo-count="actionHistory.length"
+      @close="menuOpen = false"
+      @undo="undo"
+      @end-game="endGame"
+    />
   </div>
 </template>
 
@@ -31,10 +41,11 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import SetupScreen from './components/SetupScreen.vue'
 import GameTable from './components/GameTable.vue'
 import GameEnd from './components/GameEnd.vue'
+import GameMenu from './components/GameMenu.vue'
 
 export default {
   name: 'App',
-  components: { SetupScreen, GameTable, GameEnd },
+  components: { SetupScreen, GameTable, GameEnd, GameMenu },
   setup() {
     const gameState = ref('setup')
     const players = ref([])
@@ -44,6 +55,8 @@ export default {
     const turnHistory = ref([])
     const savedGames = ref([])
     const commanderDamage = ref({})
+    const actionHistory = ref([])
+    const menuOpen = ref(false)
 
     let timerInterval = null
 
@@ -62,6 +75,7 @@ export default {
         defeatedBy: null
       }))
       commanderDamage.value = {}
+      actionHistory.value = []
       currentPlayerIndex.value = 0
       turnStartTime.value = Date.now()
       turnHistory.value = [{
@@ -115,9 +129,21 @@ export default {
       saveToStorage()
     }
 
-    const updateLife = (playerId, delta) => {
+    const updateLife = (playerId, delta, sourceId = null) => {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
+        actionHistory.value.push({
+          type: 'life',
+          playerId,
+          previousValue: player.life,
+          newValue: player.life + delta,
+          delta,
+          sourceId
+        })
+        if (actionHistory.value.length > 5) {
+          actionHistory.value.shift()
+        }
+        
         player.life += delta
         if (player.life <= 0) {
           player.life = 0
@@ -130,9 +156,21 @@ export default {
       }
     }
 
-    const updatePoison = (playerId, delta) => {
+    const updatePoison = (playerId, delta, sourceId = null) => {
       const player = players.value.find(p => p.id === playerId)
       if (player) {
+        actionHistory.value.push({
+          type: 'poison',
+          playerId,
+          previousValue: player.poison,
+          newValue: Math.max(0, player.poison + delta),
+          delta,
+          sourceId
+        })
+        if (actionHistory.value.length > 5) {
+          actionHistory.value.shift()
+        }
+        
         player.poison = Math.max(0, player.poison + delta)
         if (player.poison >= 10) {
           player.defeated = true
@@ -149,6 +187,20 @@ export default {
       }
       commanderDamage.value[key] += damage
       
+      actionHistory.value.push({
+        type: 'commander',
+        key,
+        previousValue: commanderDamage.value[key] - damage,
+        newValue: commanderDamage.value[key],
+        sourceId,
+        targetId,
+        defeated: commanderDamage.value[key] >= 20,
+        targetDefeated: players.value.find(p => p.id === targetId)?.defeated || false
+      })
+      if (actionHistory.value.length > 5) {
+        actionHistory.value.shift()
+      }
+      
       if (commanderDamage.value[key] >= 20) {
         const target = players.value.find(p => p.id === targetId)
         const source = players.value.find(p => p.id === sourceId)
@@ -156,6 +208,45 @@ export default {
           target.defeated = true
           target.defeatReason = 'commander'
           target.defeatedBy = source?.name || 'Commander'
+        }
+      }
+      
+      saveToStorage()
+    }
+
+    const undo = () => {
+      if (actionHistory.value.length === 0) return
+      
+      const lastAction = actionHistory.value.pop()
+      
+      if (lastAction.type === 'life') {
+        const player = players.value.find(p => p.id === lastAction.playerId)
+        if (player) {
+          player.life = lastAction.previousValue
+          if (lastAction.previousValue > 0) {
+            player.defeated = false
+            player.defeatReason = null
+          }
+        }
+      } else if (lastAction.type === 'poison') {
+        const player = players.value.find(p => p.id === lastAction.playerId)
+        if (player) {
+          player.poison = lastAction.previousValue
+          if (lastAction.previousValue < 10) {
+            player.defeated = false
+            player.defeatReason = null
+          }
+        }
+      } else if (lastAction.type === 'commander') {
+        commanderDamage.value[lastAction.key] = lastAction.previousValue
+        
+        if (lastAction.targetDefeated && lastAction.previousValue < 20) {
+          const target = players.value.find(p => p.id === lastAction.targetId)
+          if (target) {
+            target.defeated = false
+            target.defeatReason = null
+            target.defeatedBy = null
+          }
         }
       }
       
@@ -191,6 +282,7 @@ export default {
       turnDuration.value = 0
       turnHistory.value = []
       commanderDamage.value = {}
+      actionHistory.value = []
       gameState.value = 'setup'
       localStorage.removeItem('mtg-commander-game')
     }
@@ -265,12 +357,15 @@ export default {
       turnHistory,
       savedGames,
       commanderDamage,
+      actionHistory,
+      menuOpen,
       startGame,
       nextTurn,
       updateLife,
       updatePoison,
       logAction,
       handleCommanderDamage,
+      undo,
       endGame,
       resetGame,
       saveGame,

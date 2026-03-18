@@ -18,8 +18,8 @@ mtg-commander-tracker/
 ├── src/
 │   ├── components/
 │   │   ├── ActionMenu.vue      # Overlay für Schadens-/Heilungsaktionen
-│   │   ├── ActionPanel.vue    # [DEPRECATED] Altes Aktionspanel
 │   │   ├── GameEnd.vue        # Spielfinale mit Statistiken
+│   │   ├── GameMenu.vue       # Hauptmenü mit Undo und Spiel beenden
 │   │   ├── GameTable.vue      # Haupt-Spielfeld mit Spielern
 │   │   ├── PlayerCard.vue     # Spieler-Karte mit Tab-System für Views
 │   │   └── SetupScreen.vue    # Spiel-Einrichtung (Spieler hinzufügen)

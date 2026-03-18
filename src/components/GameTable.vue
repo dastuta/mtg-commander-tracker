@@ -5,6 +5,9 @@
         <span class="turn-number">Zug {{ currentTurnNumber }}</span>
         <span class="turn-timer">{{ formattedTime }}</span>
       </div>
+      <button class="menu-btn" @click="$emit('open-menu')">
+        ☰
+      </button>
       <div class="current-player-info">
         <span class="label">Aktiver Spieler:</span>
         <span class="name">{{ currentPlayer?.name }}</span>
@@ -53,10 +56,6 @@
     <button class="btn btn-next" @click="endTurn">
       Zug beenden → {{ nextPlayerName }}
     </button>
-
-    <button class="btn btn-end" @click="$emit('end-game')">
-      Spiel beenden
-    </button>
   </div>
 </template>
 
@@ -74,7 +73,7 @@ export default {
     turnHistory: Array,
     commanderDamage: Object
   },
-  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action', 'commander-damage'],
+  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action', 'commander-damage', 'open-menu'],
   data() {
     return {
       isDragging: false,
@@ -309,6 +308,24 @@ export default {
   text-align: right;
 }
 
+.menu-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: #3a3a5a;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-btn:hover {
+  background: #4a4a6a;
+}
+
 .current-player-info .label {
   font-size: 0.8rem;
   color: #888;
@@ -398,18 +415,5 @@ export default {
 
 .btn-next:hover {
   background: #a01830;
-}
-
-.btn-end {
-  margin-top: 0.5rem;
-  background: transparent;
-  border: 2px solid #666;
-  color: #888;
-  width: 100%;
-}
-
-.btn-end:hover {
-  border-color: #c41e3a;
-  color: #c41e3a;
 }
 </style>
