@@ -355,6 +355,8 @@ export default {
 }
 .players-grid.players-4 { 
   grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  align-content: stretch;
 }
 .players-grid.players-5 { 
   grid-template-columns: repeat(2, 1fr);
@@ -366,6 +368,7 @@ export default {
 @media (max-width: 600px) {
   .players-grid {
     grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
   }
 }
 
