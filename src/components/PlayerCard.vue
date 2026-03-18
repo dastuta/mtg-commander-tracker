@@ -20,23 +20,11 @@
       </span>
     </div>
     
-    <div class="player-stats">
-      <div class="stat life" :class="{ low: player.life <= 10, critical: player.life <= 5 }">
-        <span class="stat-label">Leben</span>
-        <span class="stat-value">{{ player.life }}</span>
-      </div>
-
-      <div class="stat poison" :class="{ warning: player.poison >= 7, critical: player.poison >= 10 }">
-        <span class="stat-label">Gift</span>
-        <span class="stat-value">{{ player.poison }}</span>
-      </div>
-    </div>
-
-    <div class="commander-damage-list" v-if="commanderDamageList.length > 0">
-      <div v-for="cd in commanderDamageList" :key="cd.source" class="commander-damage-item">
-        {{ cd.source }}: {{ cd.damage }}/20
-      </div>
-    </div>
+    <PlayerView 
+      :player="player"
+      :players="players"
+      :commander-damage="commanderDamage"
+    />
 
     <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated">
       {{ player.turnCount }} Züge
@@ -52,8 +40,11 @@
 </template>
 
 <script>
+import PlayerView from './PlayerView.vue'
+
 export default {
   name: 'PlayerCard',
+  components: { PlayerView },
   props: {
     player: Object,
     isCurrent: Boolean,
@@ -64,28 +55,7 @@ export default {
   data() {
     return {
       isDragging: false,
-      isValidTarget: false,
       cardElement: null
-    }
-  },
-  computed: {
-    commanderDamageList() {
-      if (!this.commanderDamage) return []
-      
-      const list = []
-      for (const [key, damage] of Object.entries(this.commanderDamage)) {
-        const [sourceId, targetId] = key.split('-').map(Number)
-        if (targetId === this.player.id) {
-          const sourcePlayer = this.players?.find(p => p.id === sourceId)
-          if (sourcePlayer) {
-            list.push({
-              source: sourcePlayer.name,
-              damage
-            })
-          }
-        }
-      }
-      return list
     }
   },
   mounted() {
@@ -151,40 +121,8 @@ export default {
   text-decoration: line-through;
 }
 
-.defeat-badge {
-  display: block;
-  margin-top: 0.5rem;
-  padding: 0.3rem 0.6rem;
-  background: #dc2626;
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: bold;
-  border-radius: 4px;
-}
-
-.defeat-reason {
-  font-weight: normal;
-  opacity: 0.8;
-}
-
-.commander-damage-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.5rem;
-  justify-content: center;
-}
-
-.commander-damage-item {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
-  background: rgba(147, 51, 234, 0.3);
-  color: #d8b4fe;
-  border-radius: 4px;
-}
-
 .player-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
   text-align: center;
 }
 
@@ -202,46 +140,20 @@ export default {
   margin-top: 0.3rem;
 }
 
-.player-stats {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.stat {
-  flex: 1;
-  background: rgba(0,0,0,0.3);
-  border-radius: 12px;
-  padding: 0.8rem;
-  text-align: center;
-}
-
-.stat-label {
+.defeat-badge {
   display: block;
-  font-size: 0.75rem;
-  color: #888;
-  text-transform: uppercase;
-  margin-bottom: 0.3rem;
-}
-
-.stat-value {
-  display: block;
-  font-size: 2.5rem;
-  font-weight: bold;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  background: #dc2626;
   color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
 }
 
-.stat.life .stat-value { color: #4ade80; }
-.stat.life.low .stat-value { color: #fbbf24; }
-.stat.life.critical .stat-value { color: #ef4444; animation: pulse 1s infinite; }
-
-.stat.poison .stat-value { color: #a855f7; }
-.stat.poison.warning .stat-value { color: #fbbf24; }
-.stat.poison.critical .stat-value { color: #ef4444; animation: pulse 1s infinite; }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.defeat-reason {
+  font-weight: normal;
+  opacity: 0.8;
 }
 
 .turn-count {
