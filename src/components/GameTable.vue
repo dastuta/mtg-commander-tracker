@@ -166,7 +166,7 @@ export default {
         const isOver = clientX >= rect.left && clientX <= rect.right &&
                        clientY >= rect.top && clientY <= rect.bottom
         
-        if (isOver && index !== this.currentPlayerIndex) {
+        if (isOver) {
           cardEl.classList.add('validTarget')
         } else {
           cardEl.classList.remove('validTarget')
@@ -206,7 +206,7 @@ export default {
     },
     
     handleDrop(target) {
-      if (target && target.player.id !== this.currentPlayer?.id) {
+      if (target) {
         this.openActionMenu(target.player)
       }
       
