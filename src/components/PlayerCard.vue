@@ -24,6 +24,17 @@
         </div>
       </button>
 
+      <button 
+        class="edge-btn tax-btn" 
+        @click.stop="switchToTax"
+        :disabled="currentView !== 'life'"
+      >
+        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
+          <span class="edge-label">Steuer</span>
+          <span class="edge-value">{{ totalTax }}</span>
+        </div>
+      </button>
+
       <div 
         class="main-area"
         :class="{ 'no-drag': currentView !== 'life' }"
@@ -72,6 +83,31 @@
             </button>
           </div>
 
+          <div v-else-if="currentView === 'tax'" class="tax-view">
+            <div class="stat-label">Steuer-Zähler</div>
+            <div class="tax-counters">
+              <div class="tax-item">
+                <span class="tax-label">Steuer 1</span>
+                <div class="tax-controls">
+                  <button class="tax-btn-small" @click.stop="decrementTax(1)">-</button>
+                  <span class="tax-value">{{ player.tax1 }}</span>
+                  <button class="tax-btn-small" @click.stop="incrementTax(1)">+</button>
+                </div>
+              </div>
+              <div class="tax-item">
+                <span class="tax-label">Steuer 2</span>
+                <div class="tax-controls">
+                  <button class="tax-btn-small" @click.stop="decrementTax(2)">-</button>
+                  <span class="tax-value">{{ player.tax2 }}</span>
+                  <button class="tax-btn-small" @click.stop="incrementTax(2)">+</button>
+                </div>
+              </div>
+            </div>
+            <button class="back-btn" @click.stop="switchToLife">
+              ← Zurück
+            </button>
+          </div>
+
           <div class="card-footer">
             <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
               {{ player.turnCount }} Züge
@@ -111,13 +147,15 @@ export default {
     players: Array,
     commanderDamage: Object
   },
-  emits: ['drag-start'],
+  emits: ['drag-start', 'update-tax', 'double-tap'],
   data() {
     return {
       currentView: 'life',
       isDragging: false,
       cardElement: null,
-      playerRotation: 0
+      playerRotation: 0,
+      lastTapTime: 0,
+      tapTimeout: null
     }
   },
   computed: {
@@ -140,6 +178,9 @@ export default {
     },
     totalCommanderDamage() {
       return this.commanderDamageList.reduce((sum, cd) => sum + cd.damage, 0)
+    },
+    totalTax() {
+      return this.player.tax1 + this.player.tax2
     }
   },
   mounted() {
@@ -165,16 +206,42 @@ export default {
         this.currentView = 'commander'
       }
     },
+    switchToTax() {
+      if (this.currentView === 'life') {
+        this.currentView = 'tax'
+      }
+    },
+    incrementTax(taxNumber) {
+      this.$emit('update-tax', this.player.id, taxNumber, 1)
+    },
+    decrementTax(taxNumber) {
+      this.$emit('update-tax', this.player.id, taxNumber, -1)
+    },
     onDragStart(e) {
       if (this.currentView !== 'life') return
       
-      e.preventDefault()
-      this.isDragging = true
-      this.$emit('drag-start', {
-        player: this.player,
-        element: this.cardElement,
-        event: e
-      })
+      const now = Date.now()
+      const timeDiff = now - this.lastTapTime
+      
+      if (timeDiff < 300 && timeDiff > 0) {
+        clearTimeout(this.tapTimeout)
+        this.lastTapTime = 0
+        this.$emit('double-tap', this.player)
+        return
+      }
+      
+      this.lastTapTime = now
+      this.tapTimeout = setTimeout(() => {
+        if (this.currentView === 'life') {
+          e.preventDefault()
+          this.isDragging = true
+          this.$emit('drag-start', {
+            player: this.player,
+            element: this.cardElement,
+            event: e
+          })
+        }
+      }, 200)
     }
   }
 }
@@ -324,6 +391,11 @@ export default {
   color: #d8b4fe;
 }
 
+.tax-btn {
+  background: #0d9488;
+  color: #5eead4;
+}
+
 .cmd-btn {
   background: #7c3aed;
   color: #e9d5ff;
@@ -373,7 +445,8 @@ export default {
 
 .life-view,
 .poison-view,
-.commander-view {
+.commander-view,
+.tax-view {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -478,6 +551,57 @@ export default {
   border-radius: 5px;
   cursor: pointer;
   font-size: 0.75rem;
+}
+
+.tax-counters {
+  display: flex;
+  gap: 1rem;
+  margin: 0.3rem 0;
+}
+
+.tax-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.tax-label {
+  font-size: 0.55rem;
+  color: #5eead4;
+  text-transform: uppercase;
+}
+
+.tax-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.tax-btn-small {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: #0d9488;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tax-btn-small:active {
+  transform: scale(0.9);
+}
+
+.tax-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #5eead4;
+  min-width: 30px;
+  text-align: center;
 }
 
 .back-btn:hover {

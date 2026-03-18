@@ -22,7 +22,8 @@ mtg-commander-tracker/
 │   │   ├── GameMenu.vue       # Hauptmenü mit Undo und Spiel beenden
 │   │   ├── GameTable.vue      # Haupt-Spielfeld mit Spielern
 │   │   ├── PlayerCard.vue     # Spieler-Karte mit Tab-System für Views
-│   │   └── SetupScreen.vue    # Spiel-Einrichtung (Spieler hinzufügen)
+│   │   ├── SetupScreen.vue    # Spiel-Einrichtung (Spielerauswahl)
+│   │   └── Statistics.vue     # Statistiken und Spielhistorie
 │   ├── App.vue                # Hauptkomponente, State-Management
 │   └── main.js
 ├── public/
@@ -40,24 +41,25 @@ Jede Spieler-Karte hat:
 
 Die Buttons sind AUSSERHALB des Wisch-Bereichs platziert, sodass sie die Wischgesten nicht triggern.
 
-### Layout
+### PlayerCard Layout
 ```
-┌─────────────────────────────────────┐
-│         [Spieler Name]              │
-│        [Commander Name]             │
-├────┬─────────────────────────┬──────┤
-│Gift│                         │  CMD │
-│ 3  │      40 Leben          │  14  │
-│    │   (Wisch-Bereich)      │      │
-├────┴─────────────────────────┴──────┤
-│          "Ziehe für Aktionen"       │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│         [Spieler Name]                                │
+│        [Commander Name]                               │
+├────┬─────┬─────────────────────────┬──────┬────────┤
+│Gift│Steuer│                        │  CMD │        │
+│ 3  │  5  │      40 Leben          │  14  │        │
+│    │     │   (Wisch-Bereich)      │      │        │
+├────┴─────┴─────────────────────────┴──────┴────────┤
+│          "Ziehe für Aktionen" / Doppel-Tap          │
+└─────────────────────────────────────────────────────┘
 ```
 
 ### View-Zustände
 1. **life** (Standard): Leben anzeigen, Wisch aktiv
 2. **poison**: Gift anzeigen, nur Zurück-Button, Wisch deaktiviert
 3. **commander**: Commander-Schaden pro Spieler, nur Zurück-Button, Wisch deaktiviert
+4. **tax**: Zwei Steuer-Zähler mit +/- Buttons, Wisch deaktiviert
 
 ### Implementierung (PlayerCard.vue)
 
@@ -164,7 +166,171 @@ Um einen neuen View-Typ hinzuzufügen:
 - **Schadenshistorie** - Letzte X Aktionen
 - **Mana/Resources** - Falls implementiert
 
+## SourceMenu (Multi-Target Aktionen)
+
+### Auslösen
+- **Doppel-Tap** auf eine Spieler-Karte öffnet das SourceMenu
+- Der getappte Spieler wird als Quelle für Multi-Target-Aktionen festgelegt
+
+### Aktionen
+| Aktion | Effekt |
+|--------|--------|
+| **Drain** | Gegner -X Leben, Selbst +X Leben pro Gegner |
+| **Lifelink** | Gegner -X Leben, Selbst +X Leben |
+| **DMG Each** | Alle (inkl. Selbst) -X Leben |
+| **DMG Opp** | Nur Gegner -X Leben |
+| **Massen-Gift** | Alle Gegner +X Gift |
+
+### Value Input
+- +/- Buttons mit Long-Press Beschleunigung (500ms → +5 pro 500ms)
+- Live-Vorschau aller Ziele antes Anwenden
+
+## Spielerdatenbank
+
+### Konzept
+Spieler werden in einer persistenten Datenbank gespeichert:
+- Dropdown-Auswahl statt Freitext beim Spielstart
+- "Neuen Spieler erstellen" Option
+- Spieler-Verwaltung (Löschen)
+- Spielzähler pro Spieler
+
+### localStorage Key
+```
+mtg-commander-players
+```
+
+### Datenstruktur
+```js
+{
+  id: number,
+  name: string,
+  games: number,           // Anzahl gespielter Spiele
+  commanders: string[]      // Persönliche Commander-Liste
+}
+```
+
+### Spieler-Verwaltung
+- Klick auf Spieler öffnet Detailansicht
+- Commander hinzufügen/entfernen
+- Spieler löschen
+
 ## Spielregeln
+
+### Niederlage-Bedingungen
+1. **Leben ≤ 0** → Besiegt (Grund: "life")
+2. **Gift ≥ 10** → Besiegt (Grund: "poison")
+3. **Commander-Schaden ≥ 20 von同一 Spieler** → Besiegt (Grund: "commander")
+
+### Commander-Schaden Tracking
+- Gespeichert als Map: `{sourceId-targetId: schaden}`
+- Pro Spieler-Paar einzeln getrackt
+- Nur der originale Verursacher zählt für 20er-Regel
+
+## Game Record (Spielaufzeichnung)
+
+Jedes Spiel wird als umfassende Aufzeichnung gespeichert für Statistiken und Analyse.
+
+### Datenstruktur
+```js
+gameRecord = {
+  id: string,                    // Eindeutige Spiel-ID
+  startTime: timestamp,
+  endTime: timestamp,
+  players: [
+    { id, name, commander }
+  ],
+  turns: [
+    {
+      turnNumber: number,
+      playerId: number,
+      playerName: string,
+      startTime: timestamp,
+      endTime: timestamp,
+      duration: number,           // Sekunden
+      actions: [Action]
+    }
+  ],
+  currentTurn: { ... },          // Aktueller Zug (während des Spiels)
+  statistics: {
+    totalDuration: number,
+    totalActions: number
+  },
+  winner: {
+    id: number,
+    name: string,
+    reason: string
+  },
+  finalState: {
+    life: { playerId: value },
+    poison: { playerId: value },
+    commanderDamage: { key: value },
+    defeated: [{ id, name, reason, defeatedBy }]
+  }
+}
+```
+
+## Statistiken
+
+Die App speichert alle gespielten Spiele für spätere Analyse.
+
+### Statistik-Komponente
+Zugriff über den "📊 Statistiken" Button im Startbildschirm.
+
+### Angezeigte Statistiken
+- **Übersicht**: Gesamtzahl Spiele, Spielzeit, Aktionen, Spieler
+- **Gespeicherte Spiele**: Liste mit Datum, Spielern, Zügen
+- **Spieler-Statistiken**: Siege, Niederlagen, Siegrate, Schaden
+
+### localStorage Keys
+```
+mtg-commander-game-records   # Gespeicherte Spielaufzeichnungen
+mtg-commander-players         # Spieler-Datenbank
+mtg-custom-win-reasons       # Custom Sieg-Gründe
+mtg-custom-lose-reasons      # Custom Niederlage-Gründe
+```
+
+### Export/Import
+
+Daten können als JSON exportiert und importiert werden:
+- **Spieler exportieren**: Lädt `mtg-players-export.json` herunter
+- **Spiele exportieren**: Lädt `mtg-games-export.json` herunter
+- **Importieren**: Fügt exportierte Daten zusammen (Deduplizierung nach ID)
+
+### Action (Aktion)
+```js
+Action = {
+  id: string,                   // Eindeutige Aktions-ID
+  timestamp: timestamp,
+  type: 'damage' | 'heal' | 'poison' | 'commander_damage' | 'defeat' | 'victory' | 'drain_heal' | 'lifelink_heal',
+  category: 'life' | 'poison' | 'commander' | 'drain' | 'lifelink' | 'system',
+  source: { id, name } | null,
+  target: { id, name },
+  value: number,
+  previousValue: number,
+  newValue: number,
+  metadata: {}                  // Zusätzliche Daten (z.B. reason, targetCount)
+}
+```
+
+### Defeat Reasons (Niederlage-Gründe)
+- `life`: Leben auf 0
+- `poison`: Gift ≥ 10
+- `commander`: Commander Schaden ≥ 20
+- `surrender`: Aufgabe
+- `other`: Anderer Grund (freier Text)
+- `manual`: Manuell via UI
+- Custom Reasons: Werden in localStorage gespeichert
+
+### Victory Reasons (Sieg-Gründe)
+- `last_standing`: Letzter Verbleibender
+- `special_effect`: Spezial Effekt
+- `agreed`: Einvernehmlich
+- Custom Reasons: Werden in localStorage gespeichert (`mtg-custom-win-reasons`, `mtg-custom-lose-reasons`)
+
+### Gespeicherte Spiele
+```js
+localStorage: 'mtg-commander-game-records'
+```
 
 ### Niederlage-Bedingungen
 1. **Leben ≤ 0** → Besiegt (Grund: "life")
@@ -178,14 +344,24 @@ Um einen neuen View-Typ hinzuzufügen:
 
 ## Action Types
 
-| Typ | Effekt | Farbe |
-|-----|--------|-------|
-| damage | -Leben | Rot |
-| combat | -Leben (Combat) | Orange |
-| commander | -Leben (Commander) | Lila |
-| heal | +Leben | Grün |
-| poison | +Gift | Violett |
-| lifegain | -Ziel +Selbst | Türkis |
+| Typ | Effekt | Kategorie |
+|-----|--------|-----------|
+| damage | -Leben | life |
+| heal | +Leben | life |
+| poison | +Gift | poison |
+| commander_damage | Commander-Schaden | commander |
+| defeat | Spieler eliminiert | system |
+| victory | Spieler gewinnt | system |
+| drain_heal | Gesamtschaden als Heilung | drain |
+| lifelink_heal | X Schaden = X Heilung | lifelink |
+
+### Farben
+- damage: Rot
+- heal: Grün
+- poison: Violett
+- commander_damage: Lila
+- defeat: Grau
+- victory: Gold
 
 ## Datenstrukturen
 
@@ -233,6 +409,30 @@ npm install
 npm run dev      # Development Server
 npm run build    # Production Build
 npm run preview  # Preview Production Build
+```
+
+## Deployment
+
+Siehe [DEPLOY.md](./DEPLOY.md) für vollständige Deploy-Anleitung.
+
+### Schnellstart
+
+```bash
+# Build erstellen
+npm run build
+
+# Docker nutzen
+docker-compose -f deploy/docker-compose.yml up -d
+```
+
+### Projektstruktur Deploy
+
+```
+deploy/
+├── nginx.conf       # nginx Konfiguration
+├── Dockerfile       # Docker Image
+├── docker-compose.yml
+└── .dockerignore
 ```
 
 ## PWA Installation

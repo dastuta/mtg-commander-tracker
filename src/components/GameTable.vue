@@ -23,6 +23,8 @@
         :players="players"
         :commander-damage="commanderDamage"
         @drag-start="onDragStart"
+        @update-tax="(id, num, delta) => $emit('update-tax', id, num, delta)"
+        @double-tap="onDoubleTap"
         :ref="el => playerCards[index] = el"
       />
     </div>
@@ -56,16 +58,31 @@
     <button class="btn btn-next" @click="endTurn">
       Zug beenden → {{ nextPlayerName }}
     </button>
+    <SourceMenu 
+      v-if="sourceMenu.open"
+      :source-player="sourceMenu.source"
+      :all-players="players"
+      @close="closeSourceMenu"
+      @drain="handleDrain"
+      @lifelink="handleLifelink"
+      @dmg-each="handleDmgEach"
+      @dmg-opponent="handleDmgOpponent"
+      @mass-poison="handleMassPoison"
+      @lose="handleLose"
+      @win="handleWin"
+      @end-game="handleEndGame"
+    />
   </div>
 </template>
 
 <script>
 import PlayerCard from './PlayerCard.vue'
 import ActionMenu from './ActionMenu.vue'
+import SourceMenu from './SourceMenu.vue'
 
 export default {
   name: 'GameTable',
-  components: { PlayerCard, ActionMenu },
+  components: { PlayerCard, ActionMenu, SourceMenu },
   props: {
     players: Array,
     currentPlayerIndex: Number,
@@ -73,7 +90,7 @@ export default {
     turnHistory: Array,
     commanderDamage: Object
   },
-  emits: ['next-turn', 'update-life', 'update-poison', 'end-game', 'log-action', 'commander-damage', 'open-menu'],
+  emits: ['next-turn', 'update-life', 'update-poison', 'update-tax', 'end-game', 'log-action', 'commander-damage', 'open-menu', 'drain', 'lifelink', 'dmg_each', 'dmg_opponent', 'mass_poison', 'lose', 'win'],
   data() {
     return {
       isDragging: false,
@@ -83,6 +100,10 @@ export default {
       actionMenu: {
         open: false,
         target: null,
+        source: null
+      },
+      sourceMenu: {
+        open: false,
         source: null
       }
     }
@@ -226,6 +247,56 @@ export default {
       this.actionMenu.source = null
     },
     
+    onDoubleTap(player) {
+      this.sourceMenu.open = true
+      this.sourceMenu.source = player
+    },
+    
+    closeSourceMenu() {
+      this.sourceMenu.open = false
+      this.sourceMenu.source = null
+    },
+    
+    handleDrain(data) {
+      this.$emit('drain', data)
+      this.closeSourceMenu()
+    },
+    
+    handleLifelink(data) {
+      this.$emit('lifelink', data)
+      this.closeSourceMenu()
+    },
+    
+    handleDmgEach(data) {
+      this.$emit('dmg-each', data)
+      this.closeSourceMenu()
+    },
+    
+    handleDmgOpponent(data) {
+      this.$emit('dmg-opponent', data)
+      this.closeSourceMenu()
+    },
+    
+    handleMassPoison(data) {
+      this.$emit('mass-poison', data)
+      this.closeSourceMenu()
+    },
+    
+    handleLose(data) {
+      this.$emit('lose', data)
+      this.closeSourceMenu()
+    },
+    
+    handleWin(data) {
+      this.$emit('win', data)
+      this.closeSourceMenu()
+    },
+    
+    handleEndGame(data) {
+      this.$emit('end-game', data)
+      this.closeSourceMenu()
+    },
+    
     resetDrag() {
       this.isDragging = false
       this.dragSource = null
@@ -246,6 +317,8 @@ export default {
         this.$emit('update-life', action.targetId, action.delta)
       } else if (action.type === 'poison') {
         this.$emit('update-poison', action.targetId, action.delta)
+      } else if (action.type === 'tax') {
+        this.$emit('update-tax', action.targetId, action.taxNumber, action.delta)
       }
       
       if (action.type === 'commander') {
@@ -260,7 +333,7 @@ export default {
     },
     
     endTurn() {
-      this.$emit('next-turn', [])
+      this.$emit('next-turn')
     }
   }
 }
