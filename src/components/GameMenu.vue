@@ -41,6 +41,7 @@ export default {
     },
     endGame() {
       this.$emit('end-game')
+      this.$emit('close')
     }
   }
 }

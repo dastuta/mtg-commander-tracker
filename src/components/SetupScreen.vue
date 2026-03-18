@@ -75,25 +75,28 @@ export default {
     const decreaseCount = () => {
       if (playerCount.value > 2) {
         playerCount.value--
+        players.value.pop()
       }
     }
 
     const increaseCount = () => {
       if (playerCount.value < 6) {
+        players.value.push({ name: '', commander: '' })
         playerCount.value++
       }
     }
 
     const addPlayer = () => {
       if (playerCount.value < 6) {
+        players.value.push({ name: '', commander: '' })
         playerCount.value++
       }
     }
 
     const removePlayer = (index) => {
       if (playerCount.value > 2) {
-        playerCount.value--
         players.value.splice(index, 1)
+        playerCount.value--
       }
     }
 
