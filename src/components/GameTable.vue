@@ -209,15 +209,15 @@ export default {
     handleDrop(target) {
       if (target) {
         this.openActionMenu(target.player)
+      } else {
+        this.resetDrag()
       }
-      
-      this.resetDrag()
     },
     
     openActionMenu(targetPlayer) {
       this.actionMenu.open = true
       this.actionMenu.target = targetPlayer
-      this.actionMenu.source = this.currentPlayer
+      this.actionMenu.source = this.dragSource
     },
     
     closeActionMenu() {
