@@ -132,7 +132,7 @@ export default {
     },
     
     onMouseMove(e) {
-      if (!this.isDragging || !this.dragLine) return
+      if (!this.isDragging || !this.dragLine || this.actionMenu.open) return
       
       this.dragLine = {
         ...this.dragLine,
@@ -144,7 +144,7 @@ export default {
     },
     
     onTouchMove(e) {
-      if (!this.isDragging || !this.dragLine) return
+      if (!this.isDragging || !this.dragLine || this.actionMenu.open) return
       e.preventDefault()
       
       const touch = e.touches[0]
@@ -176,14 +176,14 @@ export default {
     },
     
     onMouseUp(e) {
-      if (!this.isDragging) return
+      if (!this.isDragging || this.actionMenu.open) return
       
       const target = this.findTargetAtPoint(e.clientX, e.clientY)
       this.handleDrop(target)
     },
     
     onTouchEnd(e) {
-      if (!this.isDragging) return
+      if (!this.isDragging || this.actionMenu.open) return
       
       const touch = e.changedTouches[0]
       const target = this.findTargetAtPoint(touch.clientX, touch.clientY)
@@ -218,6 +218,7 @@ export default {
       this.actionMenu.open = true
       this.actionMenu.target = targetPlayer
       this.actionMenu.source = this.dragSource
+      this.resetDrag()
     },
     
     closeActionMenu() {
