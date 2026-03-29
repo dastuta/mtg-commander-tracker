@@ -10,6 +10,24 @@ Eine Progressive Web App (PWA) zum Tracking von Magic: The Gathering Commander S
 - Vite
 - PWA (vite-plugin-pwa)
 - Vanilla CSS (kein Framework)
+- Backend: Express.js + PostgreSQL
+- Auth: JWT tokens
+
+## Backend API
+
+Backend läuft unter `/api`:
+- `POST /api/auth/register` - Registrieren
+- `POST /api/auth/login` - Anmelden
+- `GET /api/auth/me` - Aktuellen User holen
+- `GET /api/players` - Alle Spieler des Users
+- `POST /api/players` - Spieler erstellen
+- `GET /api/games` - Alle Spiele des Users
+- `POST /api/games` - Spiel erstellen
+- `PUT /api/games/:id` - Spiel aktualisieren
+- `GET /api/stats` - Statistiken
+- `GET /api/stats/players` - Spieler-Statistiken
+- `GET /api/stats/damage` - Schadens-Statistiken
+- `GET /api/stats/recent` - Letzte Spiele
 
 ## Projektstruktur
 
@@ -18,17 +36,26 @@ mtg-commander-tracker/
 ├── src/
 │   ├── components/
 │   │   ├── ActionMenu.vue      # Overlay für Schadens-/Heilungsaktionen
+│   │   ├── AuthScreen.vue      # Login/Registrierung
 │   │   ├── GameEnd.vue        # Spielfinale mit Statistiken
 │   │   ├── GameMenu.vue       # Hauptmenü mit Undo und Spiel beenden
 │   │   ├── GameTable.vue      # Haupt-Spielfeld mit Spielern
 │   │   ├── PlayerCard.vue     # Spieler-Karte mit Tab-System für Views
 │   │   ├── SetupScreen.vue    # Spiel-Einrichtung (Spielerauswahl)
 │   │   └── Statistics.vue     # Statistiken und Spielhistorie
+│   ├── services/
+│   │   └── api.js             # API Service Layer
 │   ├── App.vue                # Hauptkomponente, State-Management
 │   └── main.js
-├── public/
-│   └── favicon.svg
-└── index.html
+├── backend/
+│   ├── src/
+│   │   ├── db/init.js         # PostgreSQL Schema
+│   │   ├── middleware/auth.js # JWT Auth Middleware
+│   │   └── routes/           # API Routes
+│   ├── Dockerfile
+│   └── package.json
+├── docker-compose.yml         # Full Stack (Frontend + Backend + DB)
+└── nginx.conf
 ```
 
 ## Design Pattern: PlayerCard Inline-View-System
@@ -413,27 +440,44 @@ npm run preview  # Preview Production Build
 
 ## Deployment
 
-Siehe [DEPLOY.md](./DEPLOY.md) für vollständige Deploy-Anleitung.
-
-### Schnellstart
+Full Stack Deployment mit Docker Compose:
 
 ```bash
-# Build erstellen
-npm run build
+# Environment Variables setzen
+export JWT_SECRET="your-secret-key-here"
 
-# Docker nutzen
-docker-compose -f deploy/docker-compose.yml up -d
+# Bauen und starten
+docker-compose up -d
+
+# Oder mit Build
+docker-compose up -d --build
 ```
 
-### Projektstruktur Deploy
+### docker-compose.yml Services
+- **frontend**: Vue.js App (nginx)
+- **backend**: Express.js API
+- **db**: PostgreSQL 16
 
-```
-deploy/
-├── nginx.conf       # nginx Konfiguration
-├── Dockerfile       # Docker Image
-├── docker-compose.yml
-└── .dockerignore
-```
+### Traefik Routing
+- Frontend: `https://mtg-tracker.die-sons.cloud`
+- API: `https://mtg-tracker.die-sons.cloud/api`
+
+### Datenbank
+PostgreSQL mit Tables:
+- `users` - User Accounts
+- `players` - Spieler-Datenbank pro User
+- `commanders` - Commander-Liste pro Spieler
+- `games` - Spielaufzeichnungen
+- `game_players` - Spieler in einem Spiel
+- `game_turns` - Zug-Historie
+- `game_actions` - Aktions-Historie
+- `commander_damage` - Commander Schaden
+
+## Offline Mode
+
+Die App funktioniert auch ohne Backend-Verbindung:
+- Alle Daten werden in localStorage gespeichert
+- Beim nächsten Login werden Daten mit Server synchronisiert
 
 ## PWA Installation
 

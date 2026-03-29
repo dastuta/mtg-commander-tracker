@@ -215,18 +215,34 @@
 </template>
 
 <script>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import api from '../services/api.js'
 
 const PLAYER_DB_KEY = 'mtg-commander-players'
 const GAME_RECORDS_KEY = 'mtg-commander-game-records'
 
 const playerDatabase = ref([])
 const savedGameRecords = ref([])
+const isOnline = ref(false)
 
-const loadPlayerDatabase = () => {
-  const saved = localStorage.getItem(PLAYER_DB_KEY)
-  if (saved) {
-    playerDatabase.value = JSON.parse(saved)
+const loadPlayerDatabase = async () => {
+  try {
+    const { players } = await api.players.getAll()
+    playerDatabase.value = players.map(p => ({
+      id: p.id,
+      name: p.name,
+      games: p.games_played || 0,
+      commanders: p.commanders || []
+    }))
+    localStorage.setItem(PLAYER_DB_KEY, JSON.stringify(playerDatabase.value))
+    isOnline.value = true
+  } catch (e) {
+    console.warn('API unavailable, using localStorage:', e.message)
+    const saved = localStorage.getItem(PLAYER_DB_KEY)
+    if (saved) {
+      playerDatabase.value = JSON.parse(saved)
+    }
+    isOnline.value = false
   }
 }
 
@@ -241,20 +257,30 @@ const savePlayerDatabase = () => {
   localStorage.setItem(PLAYER_DB_KEY, JSON.stringify(playerDatabase.value))
 }
 
-const addPlayerToDb = (name) => {
+const addPlayerToDb = async (name) => {
   const existing = playerDatabase.value.find(p => p.name.toLowerCase() === name.toLowerCase())
   if (!existing) {
-    playerDatabase.value.push({
+    const newPlayer = {
       id: Date.now(),
       name: name.trim(),
       games: 0,
       commanders: []
-    })
+    }
+    playerDatabase.value.push(newPlayer)
+    
+    if (isOnline.value) {
+      try {
+        const result = await api.players.create(name.trim())
+        newPlayer.id = result.player.id
+      } catch (e) {
+        console.warn('Failed to sync player to API:', e.message)
+      }
+    }
     savePlayerDatabase()
   }
 }
 
-const addCommanderToPlayer = (playerName, commander) => {
+const addCommanderToPlayer = async (playerName, commander) => {
   const player = playerDatabase.value.find(p => p.name.toLowerCase() === playerName.toLowerCase())
   if (player && commander.trim()) {
     if (!player.commanders) {
@@ -264,6 +290,14 @@ const addCommanderToPlayer = (playerName, commander) => {
       player.commanders.unshift(commander.trim())
       if (player.commanders.length > 10) {
         player.commanders.pop()
+      }
+    }
+    
+    if (isOnline.value && player.id && !String(player.id).startsWith('1')) {
+      try {
+        await api.players.addCommander(player.id, commander.trim())
+      } catch (e) {
+        console.warn('Failed to sync commander to API:', e.message)
       }
     }
     savePlayerDatabase()
@@ -278,49 +312,56 @@ const incrementPlayerGames = (name) => {
   }
 }
 
-    const removePlayerFromDb = (id) => {
-      playerDatabase.value = playerDatabase.value.filter(p => p.id !== id)
-      savePlayerDatabase()
+const removePlayerFromDb = async (id) => {
+  playerDatabase.value = playerDatabase.value.filter(p => p.id !== id)
+  if (isOnline.value && id && !String(id).startsWith('1')) {
+    try {
+      await api.players.delete(id)
+    } catch (e) {
+      console.warn('Failed to delete player from API:', e.message)
     }
+  }
+  savePlayerDatabase()
+}
 
-    const openPlayerDetail = (player) => {
-      selectedPlayerDetail.value = player
-      newCommanderName.value = ''
-    }
+const openPlayerDetail = (player) => {
+  selectedPlayerDetail.value = player
+  newCommanderName.value = ''
+}
 
-    const closePlayerManager = () => {
-      showPlayerManager.value = false
-      selectedPlayerDetail.value = null
-    }
+const closePlayerManager = () => {
+  showPlayerManager.value = false
+  selectedPlayerDetail.value = null
+}
 
-    const addCommander = () => {
-      if (selectedPlayerDetail.value && newCommanderName.value.trim()) {
-        if (!selectedPlayerDetail.value.commanders) {
-          selectedPlayerDetail.value.commanders = []
-        }
-        selectedPlayerDetail.value.commanders.unshift(newCommanderName.value.trim())
-        savePlayerDatabase()
-        newCommanderName.value = ''
-      }
+const addCommander = () => {
+  if (selectedPlayerDetail.value && newCommanderName.value.trim()) {
+    if (!selectedPlayerDetail.value.commanders) {
+      selectedPlayerDetail.value.commanders = []
     }
+    selectedPlayerDetail.value.commanders.unshift(newCommanderName.value.trim())
+    savePlayerDatabase()
+    newCommanderName.value = ''
+  }
+}
 
-    const removeCommander = (playerId, index) => {
-      const player = playerDatabase.value.find(p => p.id === playerId)
-      if (player && player.commanders) {
-        player.commanders.splice(index, 1)
-        if (selectedPlayerDetail.value && selectedPlayerDetail.value.id === playerId) {
-          selectedPlayerDetail.value.commanders = [...player.commanders]
-        }
-        savePlayerDatabase()
-      }
+const removeCommander = (playerId, index) => {
+  const player = playerDatabase.value.find(p => p.id === playerId)
+  if (player && player.commanders) {
+    player.commanders.splice(index, 1)
+    if (selectedPlayerDetail.value && selectedPlayerDetail.value.id === playerId) {
+      selectedPlayerDetail.value.commanders = [...player.commanders]
     }
+    savePlayerDatabase()
+  }
+}
 
-    const deletePlayer = () => {
-      if (selectedPlayerDetail.value) {
-        removePlayerFromDb(selectedPlayerDetail.value.id)
-        selectedPlayerDetail.value = null
-      }
-    }
+const deletePlayer = () => {
+  if (selectedPlayerDetail.value) {
+    removePlayerFromDb(selectedPlayerDetail.value.id)
+    selectedPlayerDetail.value = null
+  }
+}
 
 export default {
   name: 'SetupScreen',
@@ -352,8 +393,10 @@ export default {
     const newCommanderInput = ref(null)
     const pendingCommanderIndex = ref(null)
 
-    loadPlayerDatabase()
-    loadSavedGameRecords()
+    onMounted(() => {
+      loadPlayerDatabase()
+      loadSavedGameRecords()
+    })
 
     const canStart = computed(() => {
       return players.value.slice(0, playerCount.value).every(p => p.name.trim() !== '' && p.name !== '__new__')

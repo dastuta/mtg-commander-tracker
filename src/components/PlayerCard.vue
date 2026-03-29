@@ -1,626 +1,316 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import type { Player } from '@/types'
+import { gameStore } from '@/composables/useGameState'
+import { GAME_CONFIG } from '@/utils/constants'
+
+const props = defineProps<{
+  player: Player
+  isActive: boolean
+  isFlipped?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'select-source', playerId: string): void
+  (e: 'select-source-all', playerId: string): void
+}>()
+
+function selectSource() {
+  if (!props.player.isDefeated) {
+    emit('select-source', props.player.id)
+  }
+}
+
+function selectSourceAll() {
+  if (!props.player.isDefeated) {
+    emit('select-source-all', props.player.id)
+  }
+}
+
+const lifeColor = computed(() => {
+  if (props.player.isDefeated) return 'var(--color-elimination)'
+  if (props.player.life <= 10) return 'var(--color-life-damage)'
+  return 'var(--color-life)'
+})
+
+const poisonDisplay = computed(() => {
+  if (props.player.poison === 0) return null
+  return `${props.player.poison}/${GAME_CONFIG.maxPoison}`
+})
+
+const commanderDamage = computed(() => {
+  return gameStore.getCommanderDamageDisplay(props.player.id)
+})
+
+const commanderDamageList = computed(() => {
+  const damage = gameStore.getCommanderDamageDisplay(props.player.id)
+  return Object.entries(damage).map(([sourceId, dmg]) => {
+    const sourcePlayer = gameStore.getPlayerById(sourceId)
+    return {
+      sourceId,
+      sourceName: sourcePlayer?.name || 'Unbekannt',
+      damage: dmg,
+      maxDamage: GAME_CONFIG.maxCommanderDamage
+    }
+  })
+})
+
+const hasCommanderDamage = computed(() => {
+  return commanderDamageList.value.length > 0
+})
+</script>
+
 <template>
-  <div 
-    class="player-card" 
+  <div
+    class="player-card"
     :class="{ 
-      current: isCurrent, 
-      dragging: isDragging && currentView === 'life',
-      validTarget: isValidTarget,
-      defeated: player.defeated,
-      'view-mode': currentView !== 'life'
+      'is-active': isActive,
+      'is-defeated': player.isDefeated,
+      'is-flipped': isFlipped
     }"
-    data-player-id="player.id"
   >
-    <button class="rotate-btn rotate-left" @click.stop="rotateLeft">↶</button>
-
-    <div class="card-body">
-      <button 
-        class="edge-btn poison-btn" 
-        @click.stop="switchToPoison"
-        :disabled="currentView !== 'life'"
-      >
-        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
-          <span class="edge-label">Gift</span>
-          <span class="edge-value">{{ player.poison }}</span>
-        </div>
-      </button>
-
-      <button 
-        class="edge-btn tax-btn" 
-        @click.stop="switchToTax"
-        :disabled="currentView !== 'life'"
-      >
-        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
-          <span class="edge-label">Steuer</span>
-          <span class="edge-value">{{ totalTax }}</span>
-        </div>
-      </button>
-
-      <div 
-        class="main-area"
-        :class="{ 'no-drag': currentView !== 'life' }"
-        @mousedown="onDragStart"
-        @touchstart.prevent="onDragStart"
-      >
-        <div class="text-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
-          <div class="player-header">
-            <span class="player-name">{{ player.name }}</span>
-            <span class="player-commander">{{ player.commander }}</span>
-            <span v-if="player.defeated" class="defeat-badge">
-              DEFEATED ({{ player.defeatReason }})
-            </span>
-          </div>
-
-          <div v-if="currentView === 'life'" class="life-view">
-            <div class="stat-label">Leben</div>
-            <div class="stat-value" :class="{ low: player.life <= 10, critical: player.life <= 5 }">
-              {{ player.life }}
-            </div>
-          </div>
-
-          <div v-else-if="currentView === 'poison'" class="poison-view">
-            <div class="stat-label">Gift</div>
-            <div class="stat-value" :class="{ warning: player.poison >= 7, critical: player.poison >= 10 }">
-              {{ player.poison }}
-            </div>
-            <button class="back-btn" @click.stop="switchToLife">
-              ← Zurück
-            </button>
-          </div>
-
-          <div v-else-if="currentView === 'commander'" class="commander-view">
-            <div class="stat-label">Commander Schaden</div>
-            <div class="commander-list">
-              <div v-for="cd in commanderDamageList" :key="cd.sourceId" class="cmd-item">
-                <span class="cmd-source">{{ cd.sourceName }}</span>
-                <div class="cmd-bar">
-                  <div class="cmd-fill" :style="{ width: Math.min(100, (cd.damage / 20) * 100) + '%' }"></div>
-                </div>
-                <span class="cmd-value">{{ cd.damage }}/20</span>
-              </div>
-            </div>
-            <button class="back-btn" @click.stop="switchToLife">
-              ← Zurück
-            </button>
-          </div>
-
-          <div v-else-if="currentView === 'tax'" class="tax-view">
-            <div class="stat-label">Steuer-Zähler</div>
-            <div class="tax-counters">
-              <div class="tax-item">
-                <span class="tax-label">Steuer 1</span>
-                <div class="tax-controls">
-                  <button class="tax-btn-small" @click.stop="decrementTax(1)">-</button>
-                  <span class="tax-value">{{ player.tax1 }}</span>
-                  <button class="tax-btn-small" @click.stop="incrementTax(1)">+</button>
-                </div>
-              </div>
-              <div class="tax-item">
-                <span class="tax-label">Steuer 2</span>
-                <div class="tax-controls">
-                  <button class="tax-btn-small" @click.stop="decrementTax(2)">-</button>
-                  <span class="tax-value">{{ player.tax2 }}</span>
-                  <button class="tax-btn-small" @click.stop="incrementTax(2)">+</button>
-                </div>
-              </div>
-            </div>
-            <button class="back-btn" @click.stop="switchToLife">
-              ← Zurück
-            </button>
-          </div>
-
-          <div class="card-footer">
-            <div class="turn-count" v-if="player.turnCount > 0 && !player.defeated && currentView === 'life'">
-              {{ player.turnCount }} Züge
-            </div>
-            <div class="drag-hint" v-if="isCurrent && currentView === 'life'">
-              Ziehe für Aktionen
-            </div>
-            <div class="drag-hint" v-else-if="currentView === 'life'">
-              Ziehe für Aktionen
-            </div>
-          </div>
+    <div class="player-header">
+      <span class="player-name">{{ player.name }}</span>
+      <span v-if="player.commander" class="commander-name">{{ player.commander }}</span>
+    </div>
+    
+    <div class="life-display">
+      <span class="life-value" :style="{ color: lifeColor }">
+        {{ player.life }}
+      </span>
+      <span class="life-label">LP</span>
+    </div>
+    
+    <div class="status-row">
+      <div v-if="poisonDisplay" class="status-badge poison">
+        <span class="badge-icon">☠️</span>
+        <span class="badge-value">{{ poisonDisplay }}</span>
+      </div>
+      
+      <div v-if="hasCommanderDamage" class="cmd-damages">
+        <div 
+          v-for="cmd in commanderDamageList" 
+          :key="cmd.sourceId"
+          class="cmd-badge"
+          :class="{ 'near-limit': cmd.damage >= 18 }"
+        >
+          <span class="cmd-name">{{ cmd.sourceName }}</span>
+          <span class="cmd-value">{{ cmd.damage }}/{{ cmd.maxDamage }}</span>
         </div>
       </div>
-
+    </div>
+    
+    <div class="action-buttons">
       <button 
-        class="edge-btn cmd-btn" 
-        @click.stop="switchToCommander"
-        :disabled="currentView !== 'life'"
+        class="action-btn"
+        @click="selectSource"
+        :disabled="player.isDefeated"
       >
-        <div class="btn-content" :style="{ transform: `rotate(${playerRotation}deg)` }">
-          <span class="edge-label">CMD</span>
-          <span class="edge-value">{{ totalCommanderDamage }}</span>
-        </div>
+        <span class="btn-arrow">→</span>
+        <span class="btn-text">Aktion</span>
+      </button>
+      <button 
+        class="action-btn action-all"
+        @click="selectSourceAll"
+        :disabled="player.isDefeated"
+      >
+        <span class="btn-arrow">⇉</span>
+        <span class="btn-text">Alle</span>
       </button>
     </div>
-
-    <button class="rotate-btn rotate-right" @click.stop="rotateRight">↷</button>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'PlayerCard',
-  props: {
-    player: Object,
-    isCurrent: Boolean,
-    players: Array,
-    commanderDamage: Object
-  },
-  emits: ['drag-start', 'update-tax', 'double-tap'],
-  data() {
-    return {
-      currentView: 'life',
-      isDragging: false,
-      cardElement: null,
-      playerRotation: 0,
-      lastTapTime: 0,
-      tapTimeout: null
-    }
-  },
-  computed: {
-    allOpponents() {
-      if (!this.players || !this.player) return []
-      return this.players.filter(p => p.id !== this.player.id)
-    },
-    commanderDamageList() {
-      if (!this.players || !this.player) return []
-      
-      return this.allOpponents.map(opponent => {
-        const key = `${opponent.id}-${this.player.id}`
-        const damage = this.commanderDamage?.[key] || 0
-        return {
-          sourceId: opponent.id,
-          sourceName: opponent.name,
-          damage
-        }
-      })
-    },
-    totalCommanderDamage() {
-      return this.commanderDamageList.reduce((sum, cd) => sum + cd.damage, 0)
-    },
-    totalTax() {
-      return this.player.tax1 + this.player.tax2
-    }
-  },
-  mounted() {
-    this.cardElement = this.$el
-  },
-  methods: {
-    rotateLeft() {
-      this.playerRotation = (this.playerRotation - 90 + 360) % 360
-    },
-    rotateRight() {
-      this.playerRotation = (this.playerRotation + 90) % 360
-    },
-    switchToLife() {
-      this.currentView = 'life'
-    },
-    switchToPoison() {
-      if (this.currentView === 'life') {
-        this.currentView = 'poison'
-      }
-    },
-    switchToCommander() {
-      if (this.currentView === 'life') {
-        this.currentView = 'commander'
-      }
-    },
-    switchToTax() {
-      if (this.currentView === 'life') {
-        this.currentView = 'tax'
-      }
-    },
-    incrementTax(taxNumber) {
-      this.$emit('update-tax', this.player.id, taxNumber, 1)
-    },
-    decrementTax(taxNumber) {
-      this.$emit('update-tax', this.player.id, taxNumber, -1)
-    },
-    onDragStart(e) {
-      if (this.currentView !== 'life') return
-      
-      const now = Date.now()
-      const timeDiff = now - this.lastTapTime
-      
-      if (timeDiff < 300 && timeDiff > 0) {
-        clearTimeout(this.tapTimeout)
-        this.lastTapTime = 0
-        this.$emit('double-tap', this.player)
-        return
-      }
-      
-      this.lastTapTime = now
-      this.tapTimeout = setTimeout(() => {
-        if (this.currentView === 'life') {
-          e.preventDefault()
-          this.isDragging = true
-          this.$emit('drag-start', {
-            player: this.player,
-            element: this.cardElement,
-            event: e
-          })
-        }
-      }, 200)
-    }
-  }
-}
-</script>
-
 <style scoped>
 .player-card {
-  background: rgba(255,255,255,0.05);
-  border-radius: 16px;
-  padding: 0.5rem;
-  border: 3px solid transparent;
-  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: var(--color-bg-card);
+  border: 4px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  transition: all var(--transition-base);
   user-select: none;
-  display: flex;
-  align-items: stretch;
-  gap: 0.3rem;
+  position: relative;
 }
 
-.card-body {
-  display: flex;
-  align-items: stretch;
-  gap: 0.4rem;
-  flex: 1;
+.player-card.is-active {
+  border-color: var(--color-commander);
+  box-shadow: 0 0 30px rgba(192, 132, 252, 0.4);
 }
 
-.main-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.2);
-  border-radius: 10px;
-  cursor: grab;
-  overflow: hidden;
-}
-
-.main-area:active:not(.no-drag) {
-  cursor: grabbing;
-}
-
-.main-area.no-drag {
-  cursor: default;
-}
-
-.text-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 0.5rem;
-  transition: transform 0.3s ease;
-}
-
-.player-card.current {
-  border-color: #c41e3a;
-  box-shadow: 0 0 20px rgba(196, 30, 58, 0.3);
-}
-
-.player-card.current .main-area {
-  background: rgba(196, 30, 58, 0.1);
-}
-
-.player-card.view-mode {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.player-card.dragging {
-  transform: scale(1.02);
-  box-shadow: 0 0 30px rgba(196, 30, 58, 0.5);
-}
-
-.player-card.validTarget {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.15);
-}
-
-.player-card.defeated {
-  opacity: 0.5;
-  filter: grayscale(0.8);
-}
-
-.rotate-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-  color: #aaa;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  align-self: center;
-}
-
-.rotate-btn:hover {
-  background: rgba(255,255,255,0.25);
-  color: #fff;
-}
-
-.rotate-btn:active {
-  transform: scale(0.9);
-}
-
-.edge-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.btn-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.3s ease;
-}
-
-.edge-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.edge-btn:not(:disabled):hover {
-  transform: scale(1.05);
-}
-
-.edge-btn:not(:disabled):active {
-  transform: scale(0.95);
-}
-
-.poison-btn {
-  background: #581c87;
-  color: #d8b4fe;
-}
-
-.tax-btn {
-  background: #0d9488;
-  color: #5eead4;
-}
-
-.cmd-btn {
-  background: #7c3aed;
-  color: #e9d5ff;
-}
-
-.edge-label {
-  font-size: 0.55rem;
-  text-transform: uppercase;
-  opacity: 0.8;
-}
-
-.edge-value {
-  font-size: 1.1rem;
-  font-weight: bold;
-  line-height: 1;
+.player-card.is-defeated {
+  opacity: 0.4;
 }
 
 .player-header {
-  text-align: center;
-  margin-bottom: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--space-md);
 }
 
 .player-name {
-  display: block;
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: #fff;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-align: center;
 }
 
-.player-commander {
-  display: block;
-  font-size: 0.8rem;
-  color: #888;
-  margin-top: 0.2rem;
-}
-
-.defeat-badge {
-  display: inline-block;
-  margin-top: 0.3rem;
-  padding: 0.2rem 0.5rem;
-  background: #dc2626;
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: bold;
-  border-radius: 4px;
-}
-
-.life-view,
-.poison-view,
-.commander-view,
-.tax-view {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.stat-label {
-  font-size: 0.6rem;
-  color: #888;
-  text-transform: uppercase;
-  margin-bottom: 0.1rem;
-}
-
-.stat-value {
-  font-size: 2.2rem;
-  font-weight: bold;
-  color: #4ade80;
-  line-height: 1;
-}
-
-.stat-value.low {
-  color: #fbbf24;
-}
-
-.stat-value.critical {
-  color: #ef4444;
-  animation: pulse 1s infinite;
-}
-
-.poison-view .stat-value {
-  color: #a855f7;
-}
-
-.poison-view .stat-value.warning {
-  color: #fbbf24;
-}
-
-.poison-view .stat-value.critical {
-  color: #ef4444;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.commander-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  width: 100%;
-  max-height: 70px;
-  overflow-y: auto;
-  font-size: 0.7rem;
-}
-
-.cmd-item {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.cmd-source {
-  width: 40px;
-  text-align: left;
-  color: #d8b4fe;
-  white-space: nowrap;
+.commander-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-commander);
+  text-align: center;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.65rem;
+  white-space: nowrap;
 }
 
-.cmd-bar {
-  flex: 1;
-  height: 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  overflow: hidden;
+.life-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--space-md);
 }
 
-.cmd-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #7c3aed, #9333ea);
-  border-radius: 3px;
-  transition: width 0.3s;
+.life-value {
+  font-size: 5rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: color var(--transition-base);
+}
+
+.life-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-row {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: var(--space-md);
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.status-badge.poison {
+  background: var(--color-poison-bg);
+  color: var(--color-poison);
+}
+
+.badge-icon {
+  font-size: var(--font-size-base);
+}
+
+.badge-value {
+  font-family: monospace;
+}
+
+.cmd-damages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  justify-content: center;
+}
+
+.cmd-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-commander-bg);
+  color: var(--color-commander);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+}
+
+.cmd-badge.near-limit {
+  background: rgba(239, 68, 68, 0.3);
+  color: var(--color-life-damage);
+}
+
+.cmd-name {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.cmd-badge.near-limit .cmd-name {
+  color: var(--color-text-secondary);
 }
 
 .cmd-value {
-  width: 35px;
-  text-align: right;
-  color: #888;
-  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: monospace;
 }
 
-.back-btn {
-  margin-top: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  background: #3a3a5a;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
+.action-buttons {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
   cursor: pointer;
-  font-size: 0.75rem;
+  transition: all var(--transition-fast);
 }
 
-.tax-counters {
-  display: flex;
-  gap: 1rem;
-  margin: 0.3rem 0;
+.action-btn:hover:not(:disabled) {
+  background: var(--color-commander);
+  border-color: var(--color-commander);
 }
 
-.tax-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
+.action-btn:hover:not(:disabled) .btn-arrow,
+.action-btn:hover:not(:disabled) .btn-text {
+  color: white;
 }
 
-.tax-label {
-  font-size: 0.55rem;
-  color: #5eead4;
-  text-transform: uppercase;
+.action-btn.action-all {
+  background: var(--color-bg-tertiary);
 }
 
-.tax-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+.action-btn.action-all:hover:not(:disabled) {
+  background: var(--color-damage);
+  border-color: var(--color-damage);
 }
 
-.tax-btn-small {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: #0d9488;
-  color: #fff;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.tax-btn-small:active {
-  transform: scale(0.9);
+.btn-arrow {
+  font-size: var(--font-size-lg);
+  color: var(--color-commander);
+  transition: color var(--transition-fast);
 }
 
-.tax-value {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #5eead4;
-  min-width: 30px;
-  text-align: center;
-}
-
-.back-btn:hover {
-  background: #4a4a6a;
-}
-
-.card-footer {
-  margin-top: 0.4rem;
-  text-align: center;
-}
-
-.turn-count {
-  font-size: 0.7rem;
-  color: #666;
-}
-
-.drag-hint {
-  font-size: 0.6rem;
-  color: #888;
-  opacity: 0.7;
+.btn-text {
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
 }
 </style>

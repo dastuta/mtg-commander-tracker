@@ -178,7 +178,8 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import api from '../services/api.js'
 
 const GAME_RECORDS_KEY = 'mtg-commander-game-records'
 const PLAYER_DB_KEY = 'mtg-commander-players'
@@ -194,15 +195,37 @@ export default {
     const showImportDialog = ref(false)
     const importData = ref('')
     const importType = ref('both')
+    const isOnline = ref(false)
 
-    const loadSavedGames = () => {
-      const saved = localStorage.getItem(GAME_RECORDS_KEY)
-      if (saved) {
-        savedGames.value = JSON.parse(saved)
+    const loadSavedGames = async () => {
+      try {
+        const { games } = await api.games.getAll()
+        savedGames.value = games.map(g => ({
+          id: g.id,
+          name: g.name,
+          savedAt: new Date(g.created_at).getTime(),
+          players: g.game_players || [],
+          turns: [],
+          statistics: {
+            totalDuration: g.total_duration || 0,
+            totalActions: g.total_actions || 0
+          },
+          winner: g.winner_id ? { id: g.winner_id, reason: g.winner_reason } : null
+        }))
+        isOnline.value = true
+      } catch (e) {
+        console.warn('API unavailable, using localStorage:', e.message)
+        const saved = localStorage.getItem(GAME_RECORDS_KEY)
+        if (saved) {
+          savedGames.value = JSON.parse(saved)
+        }
+        isOnline.value = false
       }
     }
 
-    loadSavedGames()
+    onMounted(() => {
+      loadSavedGames()
+    })
 
     const totalPlaytime = computed(() => {
       const total = savedGames.value.reduce((sum, game) => sum + (game.statistics?.totalDuration || 0), 0)
@@ -310,9 +333,18 @@ export default {
       showDeleteConfirm.value = true
     }
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
       if (gameToDelete.value) {
-        savedGames.value = savedGames.value.filter(g => g.id !== gameToDelete.value)
+        const gameId = gameToDelete.value
+        savedGames.value = savedGames.value.filter(g => g.id !== gameId)
+        
+        if (isOnline.value) {
+          try {
+            await api.games.delete(gameId)
+          } catch (e) {
+            console.warn('Failed to delete from API:', e.message)
+          }
+        }
         localStorage.setItem(GAME_RECORDS_KEY, JSON.stringify(savedGames.value))
         gameToDelete.value = null
         showDeleteConfirm.value = false

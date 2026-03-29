@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   mtg-tracker:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+    image: ghcr.io/dastuta/mtg-commander:latest
     container_name: mtg-commander-tracker
     restart: unless-stopped
     labels:
