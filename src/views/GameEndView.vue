@@ -102,21 +102,6 @@ function exportGame() {
   downloadJSON(exportData, `game_${gameStore.gameState.value.id}.json`)
 }
 
-async function saveToBackend() {
-  saveStatus.value = 'saving'
-  const exportData = getExportData()
-  
-  try {
-    await api.games.save(exportData)
-    saveStatus.value = 'saved'
-    setTimeout(() => { saveStatus.value = 'idle' }, 2000)
-  } catch (error) {
-    console.error('Failed to save game:', error)
-    saveStatus.value = 'error'
-    setTimeout(() => { saveStatus.value = 'idle' }, 3000)
-  }
-}
-
 function downloadJSON(data: unknown, filename: string) {
   const json = JSON.stringify(data, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
