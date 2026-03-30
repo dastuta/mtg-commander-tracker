@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: mtg-commander-backend
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       - DATABASE_URL=postgres://mtg:mtg_password@db:5432/mtg_tracker
       - PORT=3000
