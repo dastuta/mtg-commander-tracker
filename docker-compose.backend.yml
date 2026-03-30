@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   backend:
-    image: ghcr.io/dastuta/mtg-commander-tracker-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: mtg-commander-backend
     restart: unless-stopped
     environment:
