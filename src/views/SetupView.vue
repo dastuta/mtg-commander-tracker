@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { gameStore } from '@/composables/useGameState'
 import { playerDatabase } from '@/composables/usePlayerDatabase'
 import { GAME_CONFIG } from '@/utils/constants'
+
+onMounted(() => {
+  playerDatabase.loadFromAPI()
+})
 
 const router = useRouter()
 

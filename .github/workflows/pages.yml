@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_API_URL: https://mtg-api.die-sons.cloud/api
         run: npm run build
 
       - name: Upload artifact

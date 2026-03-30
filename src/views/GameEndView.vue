@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { gameStore } from '@/composables/useGameState'
+import { api } from '@/services/api'
 import { formatDuration } from '@/utils/formatters'
 
 const router = useRouter()
@@ -97,6 +98,10 @@ function exportGame() {
   }
 
   downloadJSON(exportData, `game_${gameStore.gameState.value.id}.json`)
+  
+  api.games.save(exportData)
+    .then(() => console.log('Game saved to backend'))
+    .catch(() => console.warn('Could not save game to backend'))
 }
 
 function downloadJSON(data: unknown, filename: string) {

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { STORAGE_KEYS } from '@/utils/constants'
+import { api } from '@/services/api'
 
 export interface Player {
   id: string
@@ -29,9 +30,43 @@ function savePlayers(players: Record<string, Player>) {
   localStorage.setItem(STORAGE_KEYS.players, JSON.stringify(players))
 }
 
-const playersDB = ref<Record<string, Player>>(loadPlayers())
+const playersDB = ref<Record<string, Player>>({})
+const isLoaded = ref(false)
 
 export function usePlayerDatabase() {
+  async function loadFromAPI() {
+    try {
+      const apiPlayers = await api.players.getAll()
+      const localPlayers = loadPlayers()
+      
+      for (const p of apiPlayers) {
+        const id = generatePlayerId(p.name)
+        const local = localPlayers[id]
+        
+        playersDB.value[id] = {
+          id,
+          name: p.name,
+          commanders: p.commanders?.map(c => c.name) || [],
+          games: Math.max(p.games_played || 0, local?.games || 0),
+          createdAt: p.created_at || new Date().toISOString()
+        }
+      }
+      
+      for (const [id, p] of Object.entries(localPlayers)) {
+        if (!playersDB.value[id]) {
+          playersDB.value[id] = p
+        }
+      }
+      
+      savePlayers(playersDB.value)
+      isLoaded.value = true
+    } catch (error) {
+      console.warn('API unavailable, using localStorage:', error)
+      playersDB.value = loadPlayers()
+      isLoaded.value = true
+    }
+  }
+
   const players = computed(() => {
     return Object.values(playersDB.value).sort((a, b) => b.games - a.games)
   })
@@ -41,19 +76,23 @@ export function usePlayerDatabase() {
     return playersDB.value[id]
   }
 
-  function addPlayer(name: string, commander: string | null = null): Player {
+  async function addPlayer(name: string, commander: string | null = null): Promise<Player> {
     const id = generatePlayerId(name)
     const existing = playersDB.value[id]
     
     if (existing) {
+      existing.games++
       if (commander && !existing.commanders.includes(commander)) {
         existing.commanders.push(commander)
-        existing.games++
-        savePlayers(playersDB.value)
-      } else {
-        existing.games++
-        savePlayers(playersDB.value)
       }
+      savePlayers(playersDB.value)
+      
+      try {
+        await api.players.createOrUpdate(name, commander)
+      } catch (e) {
+        console.warn('Could not sync to API')
+      }
+      
       return existing
     }
 
@@ -67,36 +106,14 @@ export function usePlayerDatabase() {
     
     playersDB.value[id] = newPlayer
     savePlayers(playersDB.value)
+    
+    try {
+      await api.players.createOrUpdate(name, commander)
+    } catch (e) {
+      console.warn('Could not sync to API')
+    }
+    
     return newPlayer
-  }
-
-  function addCommanderToPlayer(name: string, commander: string) {
-    const player = getPlayer(name)
-    if (player && !player.commanders.includes(commander)) {
-      player.commanders.push(commander)
-      savePlayers(playersDB.value)
-    }
-  }
-
-  function removePlayer(id: string) {
-    delete playersDB.value[id]
-    savePlayers(playersDB.value)
-  }
-
-  function updatePlayerName(oldName: string, newName: string) {
-    const oldId = generatePlayerId(oldName)
-    const newId = generatePlayerId(newName)
-    
-    if (oldId === newId) return
-    
-    const player = playersDB.value[oldId]
-    if (player) {
-      player.id = newId
-      player.name = newName
-      playersDB.value[newId] = player
-      delete playersDB.value[oldId]
-      savePlayers(playersDB.value)
-    }
   }
 
   function getCommandersForPlayer(name: string): string[] {
@@ -108,33 +125,14 @@ export function usePlayerDatabase() {
     return Object.values(playersDB.value)
   }
 
-  function importPlayers(players: Player[]) {
-    for (const player of players) {
-      if (!playersDB.value[player.id]) {
-        playersDB.value[player.id] = player
-      } else {
-        const existing = playersDB.value[player.id]
-        for (const commander of player.commanders) {
-          if (!existing.commanders.includes(commander)) {
-            existing.commanders.push(commander)
-          }
-        }
-        existing.games = Math.max(existing.games, player.games)
-      }
-    }
-    savePlayers(playersDB.value)
-  }
-
   return {
     players,
+    isLoaded,
+    loadFromAPI,
     getPlayer,
     addPlayer,
-    addCommanderToPlayer,
-    removePlayer,
-    updatePlayerName,
     getCommandersForPlayer,
-    exportPlayers,
-    importPlayers
+    exportPlayers
   }
 }
 
