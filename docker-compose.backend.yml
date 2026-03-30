@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/dastuta/mtg-commander-tracker-backend:latest
+    container_name: mtg-commander-backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://mtg:mtg_password@db:5432/mtg_tracker
+      - PORT=3000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`mtg-api.die-sons.cloud`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+      - "com.docker.compose.project=mtg-commander-tracker"
+      - "com.docker.compose.service=backend"
+    networks:
+      - traefik_default
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: mtg-commander-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mtg_tracker
+      - POSTGRES_USER=mtg
+      - POSTGRES_PASSWORD=mtg_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mtg -d mtg_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - traefik_default
+
+networks:
+  traefik_default:
+    external: true
+
+volumes:
+  pgdata:
