@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { gameStore } from '@/composables/useGameState'
 import { api } from '@/services/api'
 import { formatDuration } from '@/utils/formatters'
 
 const router = useRouter()
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
 const winner = computed(() => {
   return gameStore.gameState.value.players.find(p => p.isWinner)
@@ -42,14 +43,12 @@ function goHome() {
   router.push('/')
 }
 
-function exportGame() {
+function getExportData() {
   const durationSeconds = duration.value
   const totalTurnsVal = totalTurns.value || 1
   
-  // Calculate turns per player from actions
   const turnsPerPlayer: Record<string, number> = {}
   
-  // Count turns per player
   for (const player of gameStore.gameState.value.players) {
     const playerActions = gameStore.gameState.value.actions.filter(a => a.actor === player.id)
     if (playerActions.length > 0) {
@@ -65,7 +64,7 @@ function exportGame() {
       }
     : null
 
-  const exportData = {
+  return {
     schema_version: '1.0',
     game_id: gameStore.gameState.value.id,
     date: gameStore.gameState.value.startTime,
@@ -96,30 +95,41 @@ function exportGame() {
         : undefined,
     })),
   }
+}
 
+function exportGame() {
+  const exportData = getExportData()
   downloadJSON(exportData, `game_${gameStore.gameState.value.id}.json`)
+}
+
+async function saveToBackend() {
+  saveStatus.value = 'saving'
+  const exportData = getExportData()
   
-  api.games.save(exportData)
-    .then(() => console.log('Game saved to backend'))
-    .catch(() => console.warn('Could not save game to backend'))
+  try {
+    await api.games.save(exportData)
+    saveStatus.value = 'saved'
+    setTimeout(() => { saveStatus.value = 'idle' }, 2000)
+  } catch (error) {
+    console.error('Failed to save game:', error)
+    saveStatus.value = 'error'
+    setTimeout(() => { saveStatus.value = 'idle' }, 3000)
+  }
 }
 
 function downloadJSON(data: unknown, filename: string) {
   const json = JSON.stringify(data, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   
-  // Create download link
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = filename
   link.style.display = 'none'
   
-  // Append to body, click, and remove
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
   
-  // Clean up the object URL
   setTimeout(() => URL.revokeObjectURL(link.href), 100)
 }
 </script>
@@ -179,6 +189,17 @@ function downloadJSON(data: unknown, filename: string) {
     <footer class="footer">
       <button class="btn btn-secondary" @click="goHome">
         Start
+      </button>
+      <button 
+        class="btn btn-outline" 
+        :class="{ 'btn-success': saveStatus === 'saved', 'btn-error': saveStatus === 'error' }"
+        :disabled="saveStatus === 'saving'"
+        @click="saveToBackend"
+      >
+        <span v-if="saveStatus === 'idle'">💾 Speichern</span>
+        <span v-else-if="saveStatus === 'saving'">⏳...</span>
+        <span v-else-if="saveStatus === 'saved'">✓ Gespeichert</span>
+        <span v-else-if="saveStatus === 'error'">✗ Fehler</span>
       </button>
       <button class="btn btn-outline" @click="exportGame">
         Export
@@ -382,5 +403,17 @@ function downloadJSON(data: unknown, filename: string) {
 .btn-outline:hover {
   background: var(--color-bg-card);
   color: var(--color-text-primary);
+}
+
+.btn-success {
+  background: var(--color-heal) !important;
+  color: white !important;
+  border-color: var(--color-heal) !important;
+}
+
+.btn-error {
+  background: var(--color-damage) !important;
+  color: white !important;
+  border-color: var(--color-damage) !important;
 }
 </style>
