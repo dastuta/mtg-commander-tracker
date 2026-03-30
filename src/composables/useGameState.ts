@@ -238,6 +238,10 @@ export function useGameState() {
         target.life -= value
         break
         
+      case 'heal':
+        target.life += value
+        break
+        
       case 'infect':
         target.poison += value
         break

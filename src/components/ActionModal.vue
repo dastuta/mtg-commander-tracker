@@ -23,6 +23,7 @@ const lifelink = ref(false)
 
 const singleTargetTypes: { type: ActionType; label: string; icon: string; color: string }[] = [
   { type: 'damage', label: 'Damage', icon: '⚔️', color: 'var(--color-damage)' },
+  { type: 'heal', label: 'Heal', icon: '💚', color: 'var(--color-heal)' },
   { type: 'infect', label: 'Poison', icon: '☠️', color: 'var(--color-poison)' },
   { type: 'commander_dmg', label: 'CMD', icon: '👑', color: 'var(--color-commander)' },
 ]
@@ -40,7 +41,7 @@ const actionTypes = computed(() => {
 })
 
 const showLifelinkToggle = computed(() => {
-  return ['damage', 'commander_dmg'].includes(actionType.value)
+  return !props.isMultiTarget
 })
 
 const maxCommanderDamage = GAME_CONFIG.maxCommanderDamage
