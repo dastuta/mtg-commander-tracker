@@ -41,7 +41,7 @@ function getSuggestions(name: string) {
 function selectPlayer(index: number, player: typeof playerDatabase.players.value[0]) {
   playerNames.value[index] = player.name
   if (player.commanders.length > 0) {
-    commanders.value[index] = player.commanders[0]
+    commanders.value[index] = player.commanders[0].name || player.commanders[0]
   }
   showPlayerSuggestions.value[index] = false
 }
