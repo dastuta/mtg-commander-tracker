@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import playerRoutes from './routes/players.js'
 import gameRoutes from './routes/games.js'
+import deckRoutes from './routes/decks.js'
 import { initDatabase } from './db/init.js'
 
 dotenv.config()
@@ -15,6 +16,7 @@ app.use(express.json())
 
 app.use('/api/players', playerRoutes)
 app.use('/api/games', gameRoutes)
+app.use('/api/decks', deckRoutes)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
