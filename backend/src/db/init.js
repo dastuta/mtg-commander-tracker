@@ -90,7 +90,7 @@ export async function initDatabase() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS decks (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID,
         name VARCHAR(255) NOT NULL,
         description TEXT,
         format VARCHAR(50) DEFAULT 'commander',
