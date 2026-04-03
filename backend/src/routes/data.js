@@ -86,6 +86,49 @@ router.put('/:table/:id', async (req, res) => {
   }
 })
 
+router.post('/:table/upsert', async (req, res) => {
+  try {
+    const { table } = req.params
+    const data = req.body
+    if (!ALLOWED_TABLES.includes(table)) {
+      return res.status(400).json({ error: 'Table not allowed' })
+    }
+    if (!data.id) {
+      return res.status(400).json({ error: 'ID required for upsert' })
+    }
+    const columns = Object.keys(data).filter(k => !READONLY_COLUMNS.includes(k))
+    const values = columns.map((c, i) => `$${i + 1}`)
+    const updateCols = columns.filter(c => c !== 'id').map(c => `${c} = EXCLUDED.${c}`)
+    
+    let result
+    if (updateCols.length > 0) {
+      result = await query(
+        `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')})
+         ON CONFLICT (id) DO UPDATE SET ${updateCols.join(',')} RETURNING *`,
+        columns.map(c => data[c])
+      )
+    } else {
+      result = await query(
+        `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')})
+         ON CONFLICT (id) DO NOTHING RETURNING *`,
+        columns.map(c => data[c])
+      )
+    }
+    
+    if (result.rows.length === 0) {
+      result = await query(`SELECT * FROM ${table} WHERE id = $1`, [data.id])
+    }
+    
+    res.json({ 
+      action: result.rows.length > 0 && result.rows[0].id === data.id ? 'inserted' : 'updated',
+      data: result.rows[0] 
+    })
+  } catch (error) {
+    console.error('Upsert error:', error)
+    res.status(500).json({ error: 'Failed to upsert data' })
+  }
+})
+
 router.delete('/:table/:id', async (req, res) => {
   try {
     const { table, id } = req.params
