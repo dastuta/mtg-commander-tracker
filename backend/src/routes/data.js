@@ -124,8 +124,8 @@ router.post('/:table/upsert', async (req, res) => {
       data: result.rows[0] 
     })
   } catch (error) {
-    console.error('Upsert error:', error)
-    res.status(500).json({ error: 'Failed to upsert data' })
+    console.error('Upsert error:', error.message, error.code)
+    res.status(500).json({ error: 'Failed to upsert data', detail: error.message })
   }
 })
 
