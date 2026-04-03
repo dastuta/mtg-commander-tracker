@@ -86,4 +86,41 @@ router.put('/:table/:id', async (req, res) => {
   }
 })
 
+router.delete('/:table/:id', async (req, res) => {
+  try {
+    const { table, id } = req.params
+    if (!ALLOWED_TABLES.includes(table)) {
+      return res.status(400).json({ error: 'Table not allowed' })
+    }
+    const result = await query(
+      `DELETE FROM ${table} WHERE id = $1 RETURNING id`,
+      [id]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Row not found' })
+    }
+    res.json({ message: 'Deleted successfully', id })
+  } catch (error) {
+    console.error('Delete error:', error)
+    res.status(500).json({ error: 'Failed to delete data' })
+  }
+})
+
+router.delete('/:table', async (req, res) => {
+  try {
+    const { table } = req.params
+    if (!ALLOWED_TABLES.includes(table)) {
+      return res.status(400).json({ error: 'Table not allowed' })
+    }
+    if (!['games', 'decks', 'invites'].includes(table)) {
+      return res.status(403).json({ error: 'Cannot truncate this table' })
+    }
+    await query(`DELETE FROM ${table}`)
+    res.json({ message: `All rows deleted from ${table}` })
+  } catch (error) {
+    console.error('Delete all error:', error)
+    res.status(500).json({ error: 'Failed to delete data' })
+  }
+})
+
 export default router
