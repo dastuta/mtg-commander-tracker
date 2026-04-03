@@ -96,6 +96,52 @@ curl -X PUT -H "Authorization: Bearer DEIN_API_KEY" \
 
 **Hinweis:** Die Spalten `id` und `created_at` können nicht geändert werden.
 
+### POST /data/{table}/upsert
+Spalte einfügen oder aktualisieren (Insert-or-Update).
+
+**Verhalten:**
+- Wenn die ID **nicht existiert** → INSERT (neue Zeile)
+- Wenn die ID **bereits existiert** → UPDATE (nur übergebene Spalten ändern, andere bleiben unberührt)
+
+```bash
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "UUID-DER-ZEILE",
+    "feld1": "NeuerWert",
+    "feld2": "NochEinWert"
+  }' \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
+```
+
+**Beispiel: Spiel aktualisieren**
+```bash
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "22d71602-a754-4374-8003-51825d4ca0c7",
+    "external_id": "123456",
+    "winner_name": "Max"
+  }' \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
+```
+
+**Response:**
+```json
+{
+  "action": "updated",
+  "data": { ... }
+}
+```
+
+Oder:
+```json
+{
+  "action": "inserted",
+  "data": { ... }
+}
+```
+
 ---
 
 ## Players
