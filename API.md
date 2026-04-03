@@ -246,40 +246,61 @@ Spielexport speichern.
 ### cURL
 
 ```bash
-# Health Check
-curl https://mtg-api.die-sons.cloud/api/health
+# Health Check (ohne Auth)
+curl https://mtg-tracker.die-sons.cloud/api/health
 
 # Alle Spieler
-curl https://mtg-api.die-sons.cloud/api/players
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/players"
 
 # Neuen Spieler erstellen
-curl -X POST https://mtg-api.die-sons.cloud/api/players \
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Max", "commander": "Ur-Dragon"}'
+  -d '{"name": "Max", "commander": "Ur-Dragon"}' \
+  "https://mtg-tracker.die-sons.cloud/api/players"
 
 # Alle Spiele
-curl https://mtg-api.die-sons.cloud/api/games
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/games"
 
 # Spiel speichern
-curl -X POST https://mtg-api.die-sons.cloud/api/games \
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d @game-export.json
+  -d @game-export.json \
+  "https://mtg-tracker.die-sons.cloud/api/games"
+
+# Direkter Tabellenzugriff - alle Spieler
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/players"
+
+# Neue Spalte zu players hinzufügen (SQL direkt)
+docker exec mtg-commander-tracker-db-1 psql -U mtg -d mtg_tracker -c \
+  "ALTER TABLE players ADD COLUMN IF NOT EXISTS notes TEXT;"
 ```
 
 ### JavaScript
 
 ```javascript
-const API_BASE = 'https://mtg-api.die-sons.cloud/api'
+const API_KEY = 'DEIN_API_KEY'
+const API_BASE = 'https://mtg-tracker.die-sons.cloud/api'
+
+const headers = {
+  'Authorization': `Bearer ${API_KEY}`,
+  'Content-Type': 'application/json'
+}
 
 // Spieler laden
-const players = await fetch(`${API_BASE}/players`).then(r => r.json())
+const players = await fetch(`${API_BASE}/players`, { headers }).then(r => r.json())
 
 // Spiel speichern
 await fetch(`${API_BASE}/games`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers,
   body: JSON.stringify(gameData)
 })
+
+// Direkter Tabellenzugriff
+const games = await fetch(`${API_BASE}/data/games`, { headers }).then(r => r.json())
 ```
 
 ---
@@ -325,23 +346,107 @@ await fetch(`${API_BASE}/games`, {
 | game_id | UUID | Fremdschlüssel zu games |
 | player_name | VARCHAR | Spielername |
 | commander_name | VARCHAR | Commander-Name |
-| seat | INTEGER | Sitzplatz |
+| seat | INTEGER | Sitzplatz (Startreihenfolge) |
 | final_life | INTEGER | End-Lebenspunkte |
 | final_poison | INTEGER | End-Gift |
-| placement | INTEGER | Platzierung |
+| placement | INTEGER | Platzierung (1=Gewinner) |
 | defeated | BOOLEAN | Wurde besiegt |
 | defeat_reason | VARCHAR | Grund für Niederlage |
+| defeated_by | VARCHAR | Wer hat besiegt |
+
+### decks
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | UUID | Primärschlüssel |
+| name | VARCHAR | Deckname |
+| description | TEXT | Beschreibung |
+| format | VARCHAR | Format (default: commander) |
+| commander_name | VARCHAR | Commander des Decks |
+| is_public | BOOLEAN | Öffentlich sichtbar |
+| tags | TEXT[] | Tags für Kategorisierung |
+| created_at | TIMESTAMP | Erstellungsdatum |
+| updated_at | TIMESTAMP | Letztes Update |
+
+### deck_cards
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | UUID | Primärschlüssel |
+| deck_id | UUID | Fremdschlüssel zu decks |
+| card_id | VARCHAR | Scryfall Card ID |
+| card_name | VARCHAR | Kartenname |
+| scryfall_id | UUID | Scryfall UUID |
+| oracle_id | UUID | Oracle ID (gleiche Karte über Versionen) |
+| multiverse_ids | INTEGER[] | Multiverse IDs |
+| set_code | VARCHAR | Set-Kürzel (z.B. "MKM") |
+| set_name | VARCHAR | Voller Set-Name |
+| collector_number | VARCHAR | Sammlerkartennummer |
+| rarity | VARCHAR | Seltenheit |
+| is_foil | BOOLEAN | Foil-Version |
+| cmc | DECIMAL | Converted Mana Cost |
+| quantity | INTEGER | Anzahl (default: 1) |
+| slot | INTEGER | Sortierung |
+| zone | VARCHAR | Zone (mainboard/sideboard) |
+| image_url | TEXT | Bild-URL |
+
+### invites
+| Spalte | Typ | Beschreibung |
+|--------|-----|-------------|
+| id | UUID | Primärschlüssel |
+| code | VARCHAR | Einladungscode |
+| used | BOOLEAN | Wurde verwendet |
+| used_by | UUID | User der registriert hat |
+| created_at | TIMESTAMP | Erstellungsdatum |
+| used_at | TIMESTAMP | Wann verwendet |
 
 ---
 
 ## Fehlerbehandlung
+
+**401 Unauthorized** - Kein oder ungültiger API-Key
+```json
+{ "error": "No API key provided" }
+```
+```json
+{ "error": "Invalid API key" }
+```
 
 **400 Bad Request** - Ungültige Eingabedaten
 ```json
 { "error": "Name is required" }
 ```
 
+**404 Not Found** - Ressource nicht gefunden
+```json
+{ "error": "Row not found" }
+```
+
 **500 Internal Server Error** - Serverfehler
 ```json
 { "error": "Failed to fetch players" }
+```
+
+---
+
+## Quick Reference
+
+```bash
+# API-Key setzen
+export API_KEY="dein-key"
+
+# Basis-Commands
+BASE="https://mtg-tracker.die-sons.cloud/api"
+AUTH="-H \"Authorization: Bearer $API_KEY\""
+
+# Tabellenzugriff
+curl $AUTH "$BASE/data/games"           # Alle Spiele
+curl $AUTH "$BASE/data/players"         # Alle Spieler
+curl $AUTH "$BASE/data/decks"           # Alle Decks
+curl $AUTH "$BASE/data/deck_cards"      # Alle Deck-Karten
+
+# Einzelne Zeilen
+curl $AUTH "$BASE/data/players/UUID"
+curl $AUTH -X POST -H "Content-Type: application/json" \
+  -d '{"name":"NeuerSpieler"}' "$BASE/data/players"
+curl $AUTH -X PUT -H "Content-Type: application/json" \
+  -d '{"name":"GeänderterName"}' "$BASE/data/players/UUID"
 ```
