@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js'
 import playerRoutes from './routes/players.js'
 import gameRoutes from './routes/games.js'
 import deckRoutes from './routes/decks.js'
+import dataRoutes from './routes/data.js'
 import { initDatabase } from './db/init.js'
 
 dotenv.config()
@@ -19,6 +20,7 @@ app.use('/api/players', playerRoutes)
 app.use('/api/games', gameRoutes)
 app.use('/api/decks', deckRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/data', dataRoutes)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })

@@ -1,12 +1,108 @@
 # MTG Commander Tracker API
 
-Öffentliche API für Spielerdaten und Spielexporte.
+**Base URL:** `https://mtg-tracker.die-sons.cloud/api`
 
-**Base URL:** `https://mtg-api.die-sons.cloud/api`
+---
+
+## Authentifizierung
+
+Alle API-Requests (außer `/health`) benötigen einen API-Key im Header:
+
+```
+Authorization: Bearer DEIN_API_KEY
+```
+
+### API-Keys
+
+| Key | Beschreibung | Einsatz |
+|-----|-------------|---------|
+| `mtg-secret-key-2024` | Standard API-Key | Alle API-Requests |
+| *(in .env setzen)* | Eigenen Key setzen | Produktion |
+
+Key setzen:
+```bash
+export API_KEY="dein-geheimer-key"
+```
+
+Oder in `docker-compose.yml`:
+```yaml
+environment:
+  - API_KEY=${API_KEY:-mtg-secret-key-2024}
+```
 
 ---
 
 ## Health Check
+
+### GET /health
+Server-Status prüfen. **Kein API-Key erforderlich.**
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-30T19:00:00.000Z"
+}
+```
+
+---
+
+## Data API (Flexible Datenzugriff)
+
+Direkter Zugriff auf alle Tabellen mit CRUD-Operationen.
+
+**Base:** `/api/data/{table}`
+
+### Erlaubte Tabellen
+- `games` - Spielaufzeichnungen
+- `game_players` - Spieler in Spielen
+- `players` - Spieler-Datenbank
+- `commanders` - Commander-Liste
+- `decks` - Decklisten
+- `deck_cards` - Karten in Decks
+- `invites` - Einladungscodes
+
+### GET /data/{table}
+Alle Einträge einer Tabelle abrufen (max 100).
+
+```bash
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/games"
+```
+
+### GET /data/{table}/{id}
+Einzelne Zeile abrufen.
+
+```bash
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/UUID-HIER"
+```
+
+### POST /data/{table}
+Neue Zeile einfügen.
+
+```bash
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Wert", "field2": "Wert2"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/players"
+```
+
+### PUT /data/{table}/{id}
+Zeile aktualisieren.
+
+```bash
+curl -X PUT -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "NeuerName"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/players/UUID-HIER"
+```
+
+**Hinweis:** Die Spalten `id` und `created_at` können nicht geändert werden.
+
+---
+
+## Players
 
 ### GET /health
 Server-Status prüfen.
