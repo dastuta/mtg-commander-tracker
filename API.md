@@ -12,14 +12,10 @@ Alle API-Requests (außer `/health`) benötigen einen API-Key im Header:
 Authorization: Bearer DEIN_API_KEY
 ```
 
-### API-Keys
+### API-Key
 
-| Key | Beschreibung | Einsatz |
-|-----|-------------|---------|
-| `mtg-secret-key-2024` | Standard API-Key | Alle API-Requests |
-| *(in .env setzen)* | Eigenen Key setzen | Produktion |
+Der API-Key wird in der `.env` Datei oder als Environment-Variable gesetzt:
 
-Key setzen:
 ```bash
 export API_KEY="dein-geheimer-key"
 ```
@@ -27,7 +23,7 @@ export API_KEY="dein-geheimer-key"
 Oder in `docker-compose.yml`:
 ```yaml
 environment:
-  - API_KEY=${API_KEY:-mtg-secret-key-2024}
+  - API_KEY=${API_KEY}
 ```
 
 ---
