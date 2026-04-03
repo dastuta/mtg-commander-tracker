@@ -58,6 +58,8 @@ Direkter Zugriff auf alle Tabellen mit CRUD-Operationen.
 - `deck_cards` - Karten in Decks
 - `invites` - Einladungscodes
 
+---
+
 ### GET /data/{table}
 Alle Einträge einer Tabelle abrufen (max 100).
 
@@ -66,13 +68,32 @@ curl -H "Authorization: Bearer DEIN_API_KEY" \
   "https://mtg-tracker.die-sons.cloud/api/data/games"
 ```
 
+**Beispiele:**
+```bash
+# Alle Spieler
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/players"
+
+# Alle Decks
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/decks"
+
+# Alle Deck-Karten
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/deck_cards"
+```
+
+---
+
 ### GET /data/{table}/{id}
 Einzelne Zeile abrufen.
 
 ```bash
 curl -H "Authorization: Bearer DEIN_API_KEY" \
-  "https://mtg-tracker.die-sons.cloud/api/data/games/UUID-HIER"
+  "https://mtg-tracker.die-sons.cloud/api/data/games/22d71602-a754-4374-8003-51825d4ca0c7"
 ```
+
+---
 
 ### POST /data/{table}
 Neue Zeile einfügen.
@@ -80,21 +101,59 @@ Neue Zeile einfügen.
 ```bash
 curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Wert", "field2": "Wert2"}' \
+  -d '{"name": "SpielerName", "games_played": 0}' \
   "https://mtg-tracker.die-sons.cloud/api/data/players"
 ```
 
-### PUT /data/{table}/{id}
-Zeile aktualisieren.
-
+**Beispiele:**
 ```bash
-curl -X PUT -H "Authorization: Bearer DEIN_API_KEY" \
+# Neuen Spieler erstellen
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "NeuerName"}' \
-  "https://mtg-tracker.die-sons.cloud/api/data/players/UUID-HIER"
+  -d '{"name": "Max", "games_played": 0}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/players"
+
+# Neues Spiel erstellen
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"start_time": "2026-04-03", "total_turns": 10}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/games"
+
+# Neues Deck erstellen
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Mein Deck", "format": "commander", "commander_name": "Ur-Dragon"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/decks"
 ```
 
-**Hinweis:** Die Spalten `id` und `created_at` können nicht geändert werden.
+---
+
+### DELETE /data/{table}/{id}
+Einzelne Zeile löschen.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/22d71602-a754-4374-8003-51825d4ca0c7"
+```
+
+**Response:**
+```json
+{ "message": "Deleted successfully", "id": "UUID" }
+```
+
+---
+
+### DELETE /data/{table}
+Alle Zeilen einer Tabelle löschen.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/games"
+```
+
+**Hinweis:** Geschützte Tabellen (`players`, `commanders`, `game_players`, `deck_cards`) können nicht geleert werden.
+
+---
 
 ### POST /data/{table}/upsert
 Spalte einfügen oder aktualisieren (Insert-or-Update).
@@ -106,40 +165,46 @@ Spalte einfügen oder aktualisieren (Insert-or-Update).
 ```bash
 curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "id": "UUID-DER-ZEILE",
-    "feld1": "NeuerWert",
-    "feld2": "NochEinWert"
-  }' \
+  -d '{"id": "UUID", "feld1": "Wert"}' \
   "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
 ```
 
-**Beispiel: Spiel aktualisieren**
+**Beispiele:**
 ```bash
+# Spiel aktualisieren
 curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "id": "22d71602-a754-4374-8003-51825d4ca0c7",
-    "external_id": "123456",
-    "winner_name": "Max"
-  }' \
+  -d '{"id": "22d71602-a754-4374-8003-51825d4ca0c7", "external_id": "123456"}' \
   "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
+
+# Gewinner setzen
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "22d71602-a754-4374-8003-51825d4ca0c7", "winner_name": "Max", "winner_reason": "last_standing"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
+
+# Spieler aktualisieren
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "UUID-DES-SPIELERS", "games_played": 10}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/players/upsert"
+
+# Deck aktualisieren
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "UUID-DES-DECKS", "description": "Aggro Deck mit vielen Kreaturen"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/decks/upsert"
 ```
 
 **Response:**
 ```json
-{
-  "action": "updated",
-  "data": { ... }
-}
+{ "action": "updated", "data": { ... } }
 ```
-
-Oder:
 ```json
-{
-  "action": "inserted",
-  "data": { ... }
-}
+{ "action": "inserted", "data": { ... } }
+```
+```json
+{ "action": "unchanged", "data": { ... } }
 ```
 
 ---
@@ -479,16 +544,28 @@ export API_KEY="dein-key"
 BASE="https://mtg-tracker.die-sons.cloud/api"
 AUTH="-H \"Authorization: Bearer $API_KEY\""
 
-# Tabellenzugriff
-curl $AUTH "$BASE/data/games"           # Alle Spiele
-curl $AUTH "$BASE/data/players"         # Alle Spieler
-curl $AUTH "$BASE/data/decks"           # Alle Decks
-curl $AUTH "$BASE/data/deck_cards"      # Alle Deck-Karten
+# === LESEN ===
+curl $AUTH "$BASE/data/games"              # Alle Spiele
+curl $AUTH "$BASE/data/players"            # Alle Spieler
+curl $AUTH "$BASE/data/decks"              # Alle Decks
+curl $AUTH "$BASE/data/game_players"       # Alle Game-Player
+curl $AUTH "$BASE/data/UUID-DES-SPIELS"   # Einzelnes Spiel
 
-# Einzelne Zeilen
-curl $AUTH "$BASE/data/players/UUID"
-curl $AUTH -X POST -H "Content-Type: application/json" \
+# === NEU ERSTELLEN ===
+curl -X POST $AUTH -H "Content-Type: application/json" \
   -d '{"name":"NeuerSpieler"}' "$BASE/data/players"
-curl $AUTH -X PUT -H "Content-Type: application/json" \
-  -d '{"name":"GeänderterName"}' "$BASE/data/players/UUID"
+
+curl -X POST $AUTH -H "Content-Type: application/json" \
+  -d '{"name":"Mein Deck","format":"commander","commander_name":"Ur-Dragon"}' "$BASE/data/decks"
+
+# === AKTUALISIEREN (Upsert) ===
+curl -X POST $AUTH -H "Content-Type: application/json" \
+  -d '{"id":"UUID","winner_name":"Max"}' "$BASE/data/games/upsert"
+
+# === LÖSCHEN ===
+curl -X DELETE $AUTH "$BASE/data/games/UUID"     # Einzelne Zeile
+curl -X DELETE $AUTH "$BASE/data/games"          # Alle Spiele leeren
+
+# === SQL DIREKT ===
+docker exec mtg-commander-tracker-db-1 psql -U mtg -d mtg_tracker -c "SELECT * FROM games LIMIT 5;"
 ```
