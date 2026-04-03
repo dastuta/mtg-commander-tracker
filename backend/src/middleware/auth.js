@@ -1,21 +1,17 @@
-import jwt from 'jsonwebtoken'
-import { query } from '../db/init.js'
+const API_KEY = process.env.API_KEY || 'mtg-api-key-2024'
 
-export async function authenticate(req, res, next) {
+export function authenticate(req, res, next) {
   const authHeader = req.headers.authorization
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' })
+    return res.status(401).json({ error: 'No API key provided' })
   }
 
-  const token = authHeader.substring(7)
+  const apiKey = authHeader.substring(7)
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.userId = decoded.userId
-    req.userEmail = decoded.email
-    next()
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' })
+  if (apiKey !== API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' })
   }
+
+  next()
 }
