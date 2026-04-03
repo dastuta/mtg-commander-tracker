@@ -16,7 +16,7 @@ Authorization: Bearer DEIN_API_KEY
 
 | Key | Beschreibung | Einsatz |
 |-----|-------------|---------|
-| `mtg-secret-key-2024` | Standard API-Key | Alle API-Requests |
+| `****` | Standard API-Key | Alle API-Requests |
 | *(in .env setzen)* | Eigenen Key setzen | Produktion |
 
 Key setzen:
