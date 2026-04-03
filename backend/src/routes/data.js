@@ -96,33 +96,32 @@ router.post('/:table/upsert', async (req, res) => {
     if (!data.id) {
       return res.status(400).json({ error: 'ID required for upsert' })
     }
-    const columns = Object.keys(data).filter(k => !READONLY_COLUMNS.includes(k))
-    const values = columns.map((c, i) => `$${i + 1}`)
-    const updateCols = columns.filter(c => c !== 'id').map(c => `${c} = EXCLUDED.${c}`)
-    
-    let result
-    if (updateCols.length > 0) {
-      result = await query(
-        `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')})
-         ON CONFLICT (id) DO UPDATE SET ${updateCols.join(',')} RETURNING *`,
-        columns.map(c => data[c])
-      )
+
+    const checkResult = await query(`SELECT id FROM ${table} WHERE id = $1`, [data.id])
+    const exists = checkResult.rows.length > 0
+
+    if (exists) {
+      const columns = Object.keys(data).filter(k => !READONLY_COLUMNS.includes(k) && k !== 'id')
+      if (columns.length > 0) {
+        const updates = columns.map((c, i) => `${c} = $${i + 2}`)
+        const result = await query(
+          `UPDATE ${table} SET ${updates.join(',')} WHERE id = $1 RETURNING *`,
+          [data.id, ...columns.map(c => data[c])]
+        )
+        res.json({ action: 'updated', data: result.rows[0] })
+      } else {
+        const result = await query(`SELECT * FROM ${table} WHERE id = $1`, [data.id])
+        res.json({ action: 'unchanged', data: result.rows[0] })
+      }
     } else {
-      result = await query(
-        `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')})
-         ON CONFLICT (id) DO NOTHING RETURNING *`,
+      const columns = Object.keys(data).filter(k => !READONLY_COLUMNS.includes(k))
+      const values = columns.map((c, i) => `$${i + 1}`)
+      const result = await query(
+        `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')}) RETURNING *`,
         columns.map(c => data[c])
       )
+      res.json({ action: 'inserted', data: result.rows[0] })
     }
-    
-    if (result.rows.length === 0) {
-      result = await query(`SELECT * FROM ${table} WHERE id = $1`, [data.id])
-    }
-    
-    res.json({ 
-      action: result.rows.length > 0 && result.rows[0].id === data.id ? 'inserted' : 'updated',
-      data: result.rows[0] 
-    })
   } catch (error) {
     console.error('Upsert error:', error.message, error.code)
     res.status(500).json({ error: 'Failed to upsert data', detail: error.message })
