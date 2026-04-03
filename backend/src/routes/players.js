@@ -1,7 +1,10 @@
 import express from 'express'
 import { query } from '../db/init.js'
+import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
+
+router.use(authenticate)
 
 router.get('/', async (req, res) => {
   try {

@@ -8,10 +8,10 @@ const router = express.Router()
 
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body
+    const { username, password, inviteCode } = req.body
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' })
+    if (!username || !password || !inviteCode) {
+      return res.status(400).json({ error: 'Username, password and invite code required' })
     }
 
     if (username.length < 3 || username.length > 50) {
@@ -24,6 +24,11 @@ router.post('/register', async (req, res) => {
 
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' })
+    }
+
+    const invite = await query('SELECT * FROM invites WHERE code = $1 AND used = FALSE', [inviteCode])
+    if (invite.rows.length === 0) {
+      return res.status(403).json({ error: 'Invalid or already used invite code' })
     }
 
     const existing = await query('SELECT id FROM users WHERE username = $1', [username.toLowerCase()])
@@ -39,6 +44,12 @@ router.post('/register', async (req, res) => {
     )
 
     const user = result.rows[0]
+
+    await query(
+      'UPDATE invites SET used = TRUE, used_by = $1, used_at = CURRENT_TIMESTAMP WHERE code = $2',
+      [user.id, inviteCode]
+    )
+
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET,
@@ -107,6 +118,39 @@ router.get('/me', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Get user error:', error)
     res.status(500).json({ error: 'Failed to get user' })
+  }
+})
+
+router.post('/invites', authenticate, async (req, res) => {
+  try {
+    const { count = 1 } = req.body
+    const codes = []
+
+    for (let i = 0; i < Math.min(count, 10); i++) {
+      const code = require('crypto').randomBytes(4).toString('hex').toUpperCase()
+      const result = await query(
+        'INSERT INTO invites (code) VALUES ($1) RETURNING code, created_at',
+        [code]
+      )
+      codes.push(result.rows[0])
+    }
+
+    res.status(201).json({ codes })
+  } catch (error) {
+    console.error('Create invite error:', error)
+    res.status(500).json({ error: 'Failed to create invite code' })
+  }
+})
+
+router.get('/invites', authenticate, async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT code, used, used_at, created_at FROM invites ORDER BY created_at DESC'
+    )
+    res.json({ invites: result.rows })
+  } catch (error) {
+    console.error('Get invites error:', error)
+    res.status(500).json({ error: 'Failed to get invites' })
   }
 })
 

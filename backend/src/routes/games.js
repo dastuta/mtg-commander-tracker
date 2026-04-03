@@ -1,7 +1,10 @@
 import express from 'express'
 import { query, getPool } from '../db/init.js'
+import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
+
+router.use(authenticate)
 
 router.get('/', async (req, res) => {
   try {
@@ -191,6 +194,25 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update game' })
   } finally {
     client.release()
+  }
+})
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const result = await query(
+      'DELETE FROM games WHERE id = $1 RETURNING id',
+      [id]
+    )
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' })
+    }
+    
+    res.json({ message: 'Game deleted successfully' })
+  } catch (error) {
+    console.error('Delete game error:', error)
+    res.status(500).json({ error: 'Failed to delete game' })
   }
 })
 

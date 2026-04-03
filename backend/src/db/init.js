@@ -149,6 +149,17 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_deck_cards_scryfall_id ON deck_cards(scryfall_id)
     `)
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS invites (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code VARCHAR(50) NOT NULL UNIQUE,
+        used BOOLEAN DEFAULT FALSE,
+        used_by UUID,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        used_at TIMESTAMP
+      )
+    `)
+
     console.log('Database tables created successfully')
   } finally {
     client.release()
