@@ -156,47 +156,94 @@ curl -X DELETE -H "Authorization: Bearer DEIN_API_KEY" \
 ---
 
 ### POST /data/{table}/upsert
-Spalte einfügen oder aktualisieren (Insert-or-Update).
+Datenbank-Operation für **INSERT oder UPDATE** in einem Aufruf.
 
 **Verhalten:**
-- Wenn die ID **nicht existiert** → INSERT (neue Zeile)
-- Wenn die ID **bereits existiert** → UPDATE (nur übergebene Spalten ändern, andere bleiben unberührt)
+1. Suche nach der übergebenen `id`
+2. **Wenn ID existiert** → UPDATE (nur übergebene Felder ändern, andere bleiben unberührt)
+3. **Wenn ID nicht existiert** → INSERT (neue Zeile erstellen)
 
+**Wichtig:**
+- `id` ist **Pflicht** im Request-Body
+- `created_at` kann nicht geändert werden
+
+**URL-Format:**
+```
+POST /api/data/{tabelle}/upsert
+```
+
+**Request-Body:**
+```json
+{
+  "id": "UUID-DER-ZEILE",
+  "feld1": "NeuerWert",
+  "feld2": 123
+}
+```
+
+**Beispiel: Spiel aktualisieren**
 ```bash
-curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+# 1. Zuerst ID herausfinden
+curl -H "Authorization: Bearer API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/games"
+
+# 2. Spiel aktualisieren (z.B. external_id setzen)
+curl -X POST -H "Authorization: Bearer API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"id": "UUID", "feld1": "Wert"}' \
+  -d '{
+    "id": "22d71602-a754-4374-8003-51825d4ca0c7",
+    "external_id": "123456"
+  }' \
+  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
+
+# 3. Mehrere Felder auf einmal aktualisieren
+curl -X POST -H "Authorization: Bearer API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "22d71602-a754-4374-8003-51825d4ca0c7",
+    "winner_name": "Max",
+    "winner_reason": "last_standing",
+    "total_turns": 15
+  }' \
   "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
 ```
 
-**Beispiele:**
+**Beispiel: Spieler aktualisieren**
 ```bash
-# Spiel aktualisieren
-curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+curl -X POST -H "Authorization: Bearer API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"id": "22d71602-a754-4374-8003-51825d4ca0c7", "external_id": "123456"}' \
-  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
-
-# Gewinner setzen
-curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"id": "22d71602-a754-4374-8003-51825d4ca0c7", "winner_name": "Max", "winner_reason": "last_standing"}' \
-  "https://mtg-tracker.die-sons.cloud/api/data/games/upsert"
-
-# Spieler aktualisieren
-curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"id": "UUID-DES-SPIELERS", "games_played": 10}' \
+  -d '{
+    "id": "UUID-DES-SPIELERS",
+    "games_played": 10,
+    "pin_hash": "hashwert123"
+  }' \
   "https://mtg-tracker.die-sons.cloud/api/data/players/upsert"
+```
 
-# Deck aktualisieren
-curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+**Beispiel: Deck aktualisieren**
+```bash
+curl -X POST -H "Authorization: Bearer API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"id": "UUID-DES-DECKS", "description": "Aggro Deck mit vielen Kreaturen"}' \
+  -d '{
+    "id": "UUID-DES-DECKS",
+    "description": "Aggro Deck mit vielen Kreaturen"
+  }' \
   "https://mtg-tracker.die-sons.cloud/api/data/decks/upsert"
 ```
 
-**Response:**
+**Beispiel: Neue Commander erstellen**
+```bash
+curl -X POST -H "Authorization: Bearer API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "NEUE-UUID",
+    "player_id": "UUID-DES-SPIELERS",
+    "name": "Ur-Dragon"
+  }' \
+  "https://mtg-tracker.die-sons.cloud/api/data/commanders/upsert"
+```
+
+**Response-Möglichkeiten:**
 ```json
 { "action": "updated", "data": { ... } }
 ```
@@ -206,6 +253,31 @@ curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
 ```json
 { "action": "unchanged", "data": { ... } }
 ```
+
+---
+
+## Spezifische Tabellen-Beispiele
+
+### commanders
+```bash
+# Alle Commander abrufen
+curl -H "Authorization: Bearer DEIN_API_KEY" \
+  "https://mtg-tracker.die-sons.cloud/api/data/commanders"
+
+# Commander erstellen (ohne Spieler-Verknüpfung)
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ur-Dragon"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/commanders"
+
+# Commander mit Spieler-Verknüpfung
+curl -X POST -H "Authorization: Bearer DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"player_id": "UUID-DES-SPIELERS", "name": "Edgar Markov"}' \
+  "https://mtg-tracker.die-sons.cloud/api/data/commanders"
+```
+
+---
 
 ---
 

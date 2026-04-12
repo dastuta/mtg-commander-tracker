@@ -31,22 +31,49 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM decks WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     )
-    
+
     if (deckResult.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' })
     }
-    
+
     const cardsResult = await query(
       'SELECT * FROM deck_cards WHERE deck_id = $1 ORDER BY slot, zone',
       [req.params.id]
     )
-    
+
     res.json({
       ...deckResult.rows[0],
       cards: cardsResult.rows
     })
   } catch (err) {
     console.error('Error fetching deck:', err)
+    res.status(500).json({ error: 'Failed to fetch deck' })
+  }
+})
+
+router.get('/by-commander/:playerId/:commanderName', async (req, res) => {
+  try {
+    const { playerId, commanderName } = req.params
+    const deckResult = await query(
+      'SELECT * FROM decks WHERE player_id = $1 AND commander_name = $2',
+      [playerId, commanderName]
+    )
+
+    if (deckResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deck not found' })
+    }
+
+    const cardsResult = await query(
+      'SELECT * FROM deck_cards WHERE deck_id = $1 ORDER BY slot, zone',
+      [deckResult.rows[0].id]
+    )
+
+    res.json({
+      ...deckResult.rows[0],
+      cards: cardsResult.rows
+    })
+  } catch (err) {
+    console.error('Error fetching deck by commander:', err)
     res.status(500).json({ error: 'Failed to fetch deck' })
   }
 })
