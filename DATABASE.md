@@ -6,7 +6,8 @@
 ```bash
 cd /opt/mtg-commander-tracker
 git pull
-docker compose -f docker-compose.backend.yml up -d
+# --build ist wichtig: ohne das wird bei Code-Änderungen das alte Image wiederverwendet
+docker compose -f docker-compose.backend.yml up -d --build
 ```
 
 ### Stop Services
