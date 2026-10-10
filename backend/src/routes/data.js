@@ -14,7 +14,7 @@ router.get('/:table', async (req, res) => {
     if (!ALLOWED_TABLES.includes(table)) {
       return res.status(400).json({ error: 'Table not allowed' })
     }
-    const result = await query(`SELECT * FROM ${table} ORDER BY created_at DESC LIMIT 100`)
+    const result = await query(`SELECT * FROM ${table} ORDER BY created_at DESC LIMIT 10000`)
     res.json(result.rows)
   } catch (error) {
     console.error('Get error:', error)
