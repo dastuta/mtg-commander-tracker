@@ -28,7 +28,6 @@ router.get('/', async (req, res) => {
       LEFT JOIN game_players gp ON gp.game_id = g.id
       GROUP BY g.id
       ORDER BY g.start_time DESC
-      LIMIT 10000
     `)
     res.json(result.rows)
   } catch (error) {
